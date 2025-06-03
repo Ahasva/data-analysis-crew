@@ -6,20 +6,28 @@ from data_analysis_crew.crew import DataAnalysisCrew
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
+
+PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DATA_PATH = os.path.join(PROJECT_ROOT, 'data', 'diabetes.csv')
+
+REQUEST="""
+What are the main factors for Diabetes? 
+Which feature in the given data has the gravest impact on the patient, 
+resulting in diabetes?
+"""
+
+
 def run():
     """
     Run the crew.
     """
-    CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-    DATA_PATH = os.path.join(CURRENT_DIR, 'diabetes.csv')
-    OUTPUT_DIR = os.path.join(CURRENT_DIR, 'output')
+    OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'output')
 
-    # Ensure the output folder exists
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
     inputs = {
         "data_source": DATA_PATH,
-        "request": "What are the main factors for Diabetes? Which feature in the given data has the gravest impact on the patient, resulting in diabetes?",
+        "request": REQUEST,
     }
 
     try:
