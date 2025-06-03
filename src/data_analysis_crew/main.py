@@ -6,12 +6,14 @@ from data_analysis_crew.crew import DataAnalysisCrew
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
-data_folder = "data"
-file_name = "diabetes.csv"
+# FILE
+DATA_FOLDER = "data"
+FILE_NAME = "diabetes.csv"
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH = os.path.join(PROJECT_ROOT, data_folder, file_name)
+DATA_PATH = os.path.join(PROJECT_ROOT, DATA_FOLDER, FILE_NAME)
 
+# PROMPT
 REQUEST="""
 What are the main factors for Diabetes? 
 Which feature in the given data has the gravest impact on the patient, 
