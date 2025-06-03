@@ -6,9 +6,11 @@ from data_analysis_crew.crew import DataAnalysisCrew
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
+data_folder = "data"
+file_name = "diabetes.csv"
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATA_PATH = os.path.join(PROJECT_ROOT, 'data', 'diabetes.csv')
+DATA_PATH = os.path.join(PROJECT_ROOT, data_folder, file_name)
 
 REQUEST="""
 What are the main factors for Diabetes? 
@@ -21,7 +23,7 @@ def run():
     """
     Run the crew.
     """
-    OUTPUT_DIR = os.path.join(PROJECT_ROOT, 'output')
+    OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 
     os.makedirs(OUTPUT_DIR, exist_ok=True)
 
