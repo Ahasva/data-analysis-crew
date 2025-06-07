@@ -1,53 +1,107 @@
-collect_and_clean_data:
+load_data:
   description: >
-    Load the dataset from the provided path and perform initial cleaning:
-    - Remove nulls
-    - Normalize column names
-    - Identify categorical vs. numeric features
+    Load the dataset from the path provided. Validate that the data is properly structured.
+    Report basic metadata including shape, column names, and missing values.
+    Save a CSV snapshot for downstream use if necessary.
 
     Data Source: {data_source}
   expected_output: >
-    A cleaned pandas-compatible dataset ready for downstream analysis.
+    A summary report including:
+    - Dataset shape
+    - List of column names and inferred data types
+    - Count of missing values per column
+    - Save path of loaded dataset file (if modified)
   agent: data_engineer
 
-analyze_data:
+clean_data:
   description: >
-    Analyze the cleaned dataset to identify which features relate most strongly
-    to the request.
+    Clean and preprocess the raw dataset:
+    - Remove or impute missing values
+    - Normalize and rename column names for consistency
+    - Convert date/time formats if present
+    - Identify categorical vs. numerical features
+    - Drop irrelevant or constant columns
+
+    Ensure compatibility with pandas operations and save cleaned dataset.
+  expected_output: >
+    A cleaned dataset path, and a Markdown summary of:
+    - Cleaning steps taken
+    - List of final feature names with types
+    - Summary table of missing values (post-cleaning)
+  agent: data_engineer
+  context: [load_data]
+
+explore_data:
+  description: >
+    Perform an exploratory analysis of the cleaned dataset:
+    - Calculate descriptive statistics
+    - Visualize distributions and relationships (scatter, histograms, boxplots)
+    - Identify key correlations and possible outliers
 
     Request: {request}
   expected_output: >
-    A structured analysis including key correlations and feature importance.
+    A Markdown report with:
+    - At least 3 plots saved to {{output_dir}}/plots
+    - A table of top correlations with the target
+    - Notes on potential biases, anomalies, or outliers
   agent: data_analyst
-  context: [collect_and_clean_data]
+  context: [clean_data]
 
+select_features:
+  description: >
+    Based on the analysis, choose the most important features related to the request:
+    {request}
+
+    Also determine whether the prediction target is:
+    - Categorical → classification
+    - Numeric → regression
+
+    Label the task type accordingly and provide reasons.
+  expected_output: >
+    A Markdown summary with:
+    - A list of top features with brief justification
+    - The inferred problem type ("classification" or "regression")
+    - Justification for problem type choice
+  agent: data_analyst
+  context: [explore_data]
+  
 build_predictive_model:
   description: >
-    Using the cleaned dataset, build a simple predictive model to classify or
-    estimate the target variable. Split the dataset into training and testing sets,
-    and evaluate the model using accuracy, F1 score, and confusion matrix.
+    Train a predictive model using:
+    - RandomForestClassifier (if classification)
+    - RandomForestRegressor (if regression)
+
+    Steps:
+    - Split dataset into train/test sets
+    - Train the model and report accuracy, F1 score (if classification), and R²/MSE (if regression)
+    - Save and return feature importances and key metrics
 
     Request: {request}
   expected_output: >
-    A brief summary of the model architecture, training process, and evaluation metrics.
-    Include accuracy, F1 score, and a brief explanation of the results.
+    A Markdown report with:
+    - Final metrics (accuracy/F1 or R²/MSE)
+    - A plot of feature importances saved to {{output_dir}}/plots/feature_importances.png
+    - Summary table of training results
   agent: model_builder
-  context: [collect_and_clean_data, analyze_data]
+  context: [clean_data, select_features]
   output_file: output/model-report.md
 
 summarize_findings:
   description: >
-    Generate an executive-level summary of the findings from the analysis and modeling tasks.
-    Write in Markdown, include 3-5 bullet points and a conclusion section.
+    Summarize the full analysis and modeling outcome for decision-makers.
+    Include:
+    - Key variables found to influence the outcome
+    - Model performance interpretation
+    - Actionable recommendations
 
-    Request: {request}
+    Include a visual:
+    ![Feature Importances](plots/feature_importances.png)
   expected_output: >
-    An insight summary including:
-    - Top features
-    - Summary of model accuracy
-    - Key takeaways for stakeholders
-    - Prefer simple matplotlib or seaborn plots (e.g., feature importances).
-    - Use markdown-friendly tables if visualizations fail.
+    A Markdown executive summary with:
+    - 3–5 bullet points
+    - A conclusion section with takeaways
+    - Embedded plot image(s)
+    - Highlight any assumptions or limitations
   agent: insight_reporter
-  context: [analyze_data, build_predictive_model]
+  context: [build_predictive_model]
   output_file: output/final-insight-summary.md

@@ -6,32 +6,34 @@ from data_analysis_crew.crew import DataAnalysisCrew
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
-# FILE
+# FILE CONFIGURATION
 DATA_FOLDER = "data"
 FILE_NAME = "diabetes.csv"
 
 PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(PROJECT_ROOT, DATA_FOLDER, FILE_NAME)
+OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
+PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
+
+# Ensure output dirs exist
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+os.makedirs(PLOTS_DIR, exist_ok=True)
 
 # PROMPT
-REQUEST="""
-What are the main factors for Diabetes? 
-Which feature in the given data has the gravest impact on the patient, 
+REQUEST = """
+What are the main factors for Diabetes?
+Which feature in the given data has the gravest impact on the patient,
 resulting in diabetes?
 """
 
-
 def run():
     """
-    Run the crew.
+    Run the full data analysis crew pipeline.
     """
-    OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
-
-    os.makedirs(OUTPUT_DIR, exist_ok=True)
-
     inputs = {
         "data_source": DATA_PATH,
         "request": REQUEST,
+        "output_dir": OUTPUT_DIR,
     }
 
     try:
@@ -40,18 +42,21 @@ def run():
         for task in crew.tasks:
             print(f"→ {task.agent.role}: {task.description[:50]}...")
 
-        crew.kickoff(inputs=inputs)
+        result = crew.kickoff(inputs=inputs)
+        print("\n✅ Analysis completed.")
+        return result
     except Exception as e:
         raise RuntimeError(f"[RUN ERROR] Failed to run the crew: {e}") from e
 
 
 def train():
     """
-    Train the crew for a given number of iterations.
+    Train the crew with synthetic prompt and iterations.
     """
     inputs = {
         "data_source": "https://example.com/data.csv",
         "request": "What are the main sales trends over the last 6 months?",
+        "output_dir": "output",
     }
 
     try:
@@ -81,6 +86,7 @@ def test():
     inputs = {
         "data_source": "https://example.com/data.csv",
         "request": "What are the main sales trends over the last 6 months?",
+        "output_dir": "output"
     }
 
     try:
