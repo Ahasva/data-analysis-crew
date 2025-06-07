@@ -1,5 +1,5 @@
 import os
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from dotenv import load_dotenv
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
@@ -21,13 +21,41 @@ print(f"Using Models:\n\tAgent Model:\t{AGENT_MODEL.model}\
       \n\tManager Model:\t{MANAGER_MODEL.model}")
 
 
-# Pydantic output from select_features task
+#_______PYDANTIC OUTPUT_______
+class LoadDataOutput(BaseModel):
+    dataset_path: str
+    shape: tuple[int, int]
+    columns: List[str]
+    dtype_map: Dict[str, str]
+    missing_values: Dict[str, int]
+
+class CleanedDataOutput(BaseModel):
+    cleaned_path: str
+    final_features: List[str]
+    categorical_features: List[str]
+    numeric_features: List[str]
+    dropped_columns: List[str]
+    imputation_summary: Dict[str, str]
+
+class ExplorationOutput(BaseModel):
+    plot_paths: List[str]
+    top_correlations: List[tuple[str, float]]
+    anomalies: List[str]
+    statistical_notes: str
+
 class FeatureSelectionOutput(BaseModel):
     problem_type: str = Field(description="classification or regression")
     top_features: List[str] = Field(description="List of selected top features")
     reasoning: str = Field(description="Why these features and why this problem type")
 
+class ModelOutput(BaseModel):
+    model_type: str
+    target: str
+    feature_importance_path: str
+    metrics: Dict[str, float]
+    confusion_matrix_path: Optional[str]
 
+#_______CREW_______
 @CrewBase
 class DataAnalysisCrew():
     """DataAnalysisCrew crew"""
@@ -42,6 +70,7 @@ class DataAnalysisCrew():
     directory_reader = DirectoryReadTool()
     file_reader = FileReadTool()
 
+    ##___AGENTS___
     @agent
     def data_engineer(self) -> Agent:
         return Agent(
@@ -111,29 +140,34 @@ class DataAnalysisCrew():
             allow_code_execution=True
         )
 
-    #_______TASKS_______
+    ##___TASKS___
     @task
     def load_data(self) -> Task:
-        return Task(config=self.tasks_config['load_data'])
+        return Task(
+            config=self.tasks_config["load_data"],
+            output_pydantic=LoadDataOutput
+        )
 
     @task
     def clean_data(self) -> Task:
         return Task(
-            config=self.tasks_config['clean_data'],
-            context=[self.load_data]
+            config=self.tasks_config["clean_data"],
+            context=[self.load_data],
+            output_pydantic=CleanedDataOutput
         )
 
     @task
     def explore_data(self) -> Task:
         return Task(
-            config=self.tasks_config['explore_data'],
-            context=[self.clean_data]
+            config=self.tasks_config["explore_data"],
+            context=[self.clean_data],
+            output_pydantic=ExplorationOutput
         )
 
     @task
     def select_features(self) -> Task:
         return Task(
-            config=self.tasks_config['select_features'],
+            config=self.tasks_config["select_features"],
             context=[self.explore_data],
             output_pydantic=FeatureSelectionOutput
         )
@@ -141,17 +175,19 @@ class DataAnalysisCrew():
     @task
     def build_predictive_model(self) -> Task:
         return Task(
-            config=self.tasks_config['build_predictive_model'],
-            context=[self.clean_data, self.select_features]
+            config=self.tasks_config["build_predictive_model"],
+            context=[self.clean_data, self.select_features],
+            output_pydantic=ModelOutput
         )
 
     @task
     def summarize_findings(self) -> Task:
         return Task(
-            config=self.tasks_config['summarize_findings'],
+            config=self.tasks_config["summarize_findings"],
             context=[self.build_predictive_model]
         )
 
+    ##___CREW___
     @crew
     def crew(self) -> Crew:
         """Creates the DataAnalysisCrew crew"""
