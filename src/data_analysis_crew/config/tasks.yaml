@@ -15,7 +15,13 @@ load_data:
 
 clean_data:
   description: >
-    Clean and preprocess the raw dataset:
+    Clean and preprocess the raw dataset previously loaded.
+
+    Dataset Path: {dataset_path}
+    Column Data Types: {dtype_map}
+    Missing Value Summary: {missing_values}
+
+    Cleaning Steps:
     - Remove or impute missing values
     - Normalize and rename column names for consistency
     - Convert date/time formats if present
@@ -33,15 +39,22 @@ clean_data:
 
 explore_data:
   description: >
-    Perform an exploratory analysis of the cleaned dataset:
-    - Calculate descriptive statistics
-    - Visualize distributions and relationships (scatter, histograms, boxplots)
-    - Identify key correlations and possible outliers
+    Perform an exploratory analysis of the cleaned dataset.
 
-    Request: {request}
+    Dataset Path: {cleaned_path}
+    Numeric Features: {numeric_features}
+    Categorical Features: {categorical_features}
+    Output Directory: {output_dir}
+
+    Tasks:
+    - Calculate descriptive statistics
+    - Visualize distributions and relationships
+    - Identify top correlations and potential outliers
+
+    Save at least 3 plots to {output_dir}/plots.
   expected_output: >
     A Markdown report with:
-    - At least 3 plots saved to {{output_dir}}/plots
+    - At least 3 plots saved to {output_dir}/plots
     - A table of top correlations with the target
     - Notes on potential biases, anomalies, or outliers
   agent: data_analyst
@@ -49,14 +62,22 @@ explore_data:
 
 select_features:
   description: >
-    Based on the analysis, choose the most important features related to the request:
+    From the prior exploratory analysis, select the most important features related to the question:
+
     {request}
+
+    Use the following inputs:
+    - Correlation Matrix: {top_correlations}
+    - Statistical Notes: {statistical_notes}
 
     Also determine whether the prediction target is:
     - Categorical → classification
     - Numeric → regression
 
-    Label the task type accordingly and provide reasons.
+    Return:
+    - A list of selected features
+    - Inferred problem type
+    - Explanation for choices
   expected_output: >
     A Markdown summary with:
     - A list of top features with brief justification
@@ -64,42 +85,66 @@ select_features:
     - Justification for problem type choice
   agent: data_analyst
   context: [explore_data]
-  
+
 build_predictive_model:
   description: >
-    Train a predictive model using:
-    - RandomForestClassifier (if classification)
-    - RandomForestRegressor (if regression)
+    Use the cleaned dataset to train a predictive model.
 
-    Steps:
-    - Split dataset into train/test sets
-    - Train the model and report accuracy, F1 score (if classification), and R²/MSE (if regression)
-    - Save and return feature importances and key metrics
-
+    Dataset Path: {cleaned_path}
+    Features: {top_features}
+    Problem Type: {problem_type}
     Request: {request}
+    Output Directory: {output_dir}
+
+    Task:
+    - If classification, use RandomForestClassifier
+    - If regression, use RandomForestRegressor
+
+    Split data, train the model, evaluate using:
+    - Accuracy, F1 Score (for classification)
+    - R², MSE (for regression)
+
+    Save:
+    - Feature importance plot to {output_dir}/plots/feature_importances.png
+    - Confusion matrix if applicable
   expected_output: >
     A Markdown report with:
     - Final metrics (accuracy/F1 or R²/MSE)
-    - A plot of feature importances saved to {{output_dir}}/plots/feature_importances.png
+    - A plot of feature importances saved to {output_dir}/plots/feature_importances.png
     - Summary table of training results
+    Formatted as markdown without "```"
   agent: model_builder
   context: [clean_data, select_features]
-  output_file: output/model-report.md
+  output_file: output/model-report.json
 
 summarize_findings:
   description: >
-    Summarize the full analysis and modeling outcome for decision-makers.
-    Include:
-    - Key variables found to influence the outcome
-    - Model performance interpretation
-    - Actionable recommendations
+    Write a high-level executive summary of the analysis.
 
+    Model: {{model_type}}
+    Metrics: {{metrics}}
+    Feature Importances: ![Feature Importances]({{feature_importance_path}})
+
+    Focus on:
+    - Key features that influence the outcome
+    - Interpretation of model performance
+    - Actionable business insights
+
+    Add a plain-language executive summary for non-technical stakeholders:
+    - Explain what the model does in 2–3 sentences
+    - Clearly state what feature(s) matter most
+    - Describe the model's confidence and limitations
+    - Provide a single-sentence recommendation based on findings
+
+    Include 3–5 bullet points and a final recommendation section.
     Include a visual:
     ![Feature Importances](plots/feature_importances.png)
+
   expected_output: >
     A Markdown executive summary with:
-    - 3–5 bullet points
-    - A conclusion section with takeaways
+    - A plain-language summary for executives (2–3 sentences)
+    - 3–5 bullet points highlighting key insights
+    - A conclusion section with takeaways and a recommendation
     - Embedded plot image(s)
     - Highlight any assumptions or limitations
   agent: insight_reporter
