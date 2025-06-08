@@ -2,16 +2,25 @@
 import os
 import sys
 import warnings
+from pathlib import Path
 from data_analysis_crew.crew import DataAnalysisCrew
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
-# FILE CONFIGURATION
-DATA_FOLDER = "data"
+# ⚑ this file lives in src/data_analysis_crew/main.py
+PROJECT_ROOT = Path(__file__).resolve().parents[2]   # jump two levels up
+DATA_PATH = PROJECT_ROOT / "knowledge" / "diabetes.csv"
+
+# pass *relative* path to the crew / tools
+RELATIVE_PATH = DATA_PATH.relative_to(PROJECT_ROOT)  
+
+DATA_FOLDER = "knowledge"
 FILE_NAME = "diabetes.csv"
 
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 DATA_PATH = os.path.join(PROJECT_ROOT, DATA_FOLDER, FILE_NAME)
+SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+
 OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
 PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
 
@@ -31,7 +40,7 @@ def run():
     Run the full data analysis crew pipeline.
     """
     inputs = {
-        "data_source": DATA_PATH,
+        "dataset_path": str(RELATIVE_PATH),
         "request": REQUEST,
         "output_dir": OUTPUT_DIR,
     }
@@ -41,6 +50,8 @@ def run():
         print("\n🧭 Final Planned Task Order:")
         for task in crew.tasks:
             print(f"→ {task.agent.role}: {task.description[:50]}...")
+
+        print("🧾 Dataset path being passed to agents:", inputs["dataset_path"])
 
         result = crew.kickoff(inputs=inputs)
         print("\n✅ Analysis completed.")
@@ -55,6 +66,7 @@ def train():
     """
     inputs = {
         "data_source": "https://example.com/data.csv",
+        "dataset_path": "https://example.com/data.csv",
         "request": "What are the main sales trends over the last 6 months?",
         "output_dir": "output",
     }
@@ -85,6 +97,7 @@ def test():
     """
     inputs = {
         "data_source": "https://example.com/data.csv",
+        "dataset_path": "https://example.com/data.csv",
         "request": "What are the main sales trends over the last 6 months?",
         "output_dir": "output"
     }

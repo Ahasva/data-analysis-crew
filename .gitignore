@@ -25,3 +25,5 @@ datacrew/
 # CrewAI outputs
 *.md
 output/
+db/
+knowledge/

@@ -1,39 +1,57 @@
 load_data:
   description: >
-    Load the dataset from the path provided. Validate that the data is properly structured.
-    Report basic metadata including shape, column names, and missing values.
-    Save a CSV snapshot for downstream use if necessary.
+    Load the CSV dataset using the exact path provided in `{dataset_path}`.
+    ⚠️ Do NOT attempt to search or list any directories.
+    
+    Use pandas to:
+    - Load the dataset from the given path
+    - Print the dataset shape and column names
+    - Report missing values and inferred column types
+    - Save a snapshot CSV if any changes were applied
 
-    Data Source: {data_source}
+    Dataset Path: {dataset_path}
   expected_output: >
     A summary report including:
     - Dataset shape
-    - List of column names and inferred data types
-    - Count of missing values per column
-    - Save path of loaded dataset file (if modified)
+    - List of column names and inferred data types (as dtype_map)
+    - Count of missing values per column (as missing_values)
+    - Save path of the loaded dataset file (if modified)
   agent: data_engineer
 
 clean_data:
   description: >
     Clean and preprocess the raw dataset previously loaded.
 
-    Dataset Path: {dataset_path}
-    Column Data Types: {dtype_map}
-    Missing Value Summary: {missing_values}
+    - If **knowledge/diabetes_cleaned.csv** already exists, just load it,
+      collect metadata, and return the path – **do not re-clean**.  
+    - Otherwise:  
+        • Read **knowledge/diabetes.csv**  
+        • Normalise column names to lower-snake-case  
+        • Handle missing values, drop constants, etc.  
+        • Save the result as **knowledge/diabetes_cleaned.csv**  
+    - Always `print()` the cleaned file path as the *first* line of
+      stdout so the Code-Interpreter tool can capture it.
 
-    Cleaning Steps:
-    - Remove or impute missing values
-    - Normalize and rename column names for consistency
-    - Convert date/time formats if present
-    - Identify categorical vs. numerical features
-    - Drop irrelevant or constant columns
+    Use the helper:
 
-    Ensure compatibility with pandas operations and save cleaned dataset.
+    ```python
+    from data_analysis_crew.tools import load_or_clean
+    df = load_or_clean()
+    ```
+
+    After that, assemble and return all fields required by
+    **CleanedDataOutput** (cleaned_path, final_features,
+    numeric_features, categorical_features, dropped_columns,
+    imputation_summary).
+
   expected_output: >
-    A cleaned dataset path, and a Markdown summary of:
-    - Cleaning steps taken
-    - List of final feature names with types
-    - Summary table of missing values (post-cleaning)
+    • First line printed = absolute or relative path to
+      **knowledge/diabetes_cleaned.csv**  
+    • Plus a Markdown summary containing:  
+        – Cleaning steps taken  
+        – Final feature list with dtypes  
+        – Missing-value summary after cleaning  
+
   agent: data_engineer
   context: [load_data]
 
@@ -41,9 +59,9 @@ explore_data:
   description: >
     Perform an exploratory analysis of the cleaned dataset.
 
-    Dataset Path: {cleaned_path}
-    Numeric Features: {numeric_features}
-    Categorical Features: {categorical_features}
+    Dataset Path: `cleaned_path`
+    Numeric Features: `numeric_features`
+    Categorical Features: `categorical_features`
     Output Directory: {output_dir}
 
     Tasks:
@@ -67,8 +85,8 @@ select_features:
     {request}
 
     Use the following inputs:
-    - Correlation Matrix: {top_correlations}
-    - Statistical Notes: {statistical_notes}
+    - Correlation Matrix: `top_correlations`
+    - Statistical Notes: `statistical_notes`
 
     Also determine whether the prediction target is:
     - Categorical → classification
@@ -90,9 +108,9 @@ build_predictive_model:
   description: >
     Use the cleaned dataset to train a predictive model.
 
-    Dataset Path: {cleaned_path}
-    Features: {top_features}
-    Problem Type: {problem_type}
+    Dataset Path: `cleaned_path`
+    Features: `top_features`
+    Problem Type: `problem_type`
     Request: {request}
     Output Directory: {output_dir}
 
@@ -121,9 +139,9 @@ summarize_findings:
   description: >
     Write a high-level executive summary of the analysis.
 
-    Model: {{model_type}}
-    Metrics: {{metrics}}
-    Feature Importances: ![Feature Importances]({{feature_importance_path}})
+    Model: `model_type`
+    Metrics: `metrics`
+    Feature Importances: ![Feature Importances](`feature_importance_path`)
 
     Focus on:
     - Key features that influence the outcome

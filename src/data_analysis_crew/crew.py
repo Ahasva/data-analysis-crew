@@ -5,106 +5,138 @@ from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
 from crewai.agents.agent_builder.base_agent import BaseAgent
 from crewai.knowledge.source.csv_knowledge_source import CSVKnowledgeSource
-from crewai_tools import CodeInterpreterTool, CSVSearchTool, DirectoryReadTool, FileReadTool, FileWriterTool
-
+from crewai_tools import (
+    CodeInterpreterTool,
+    CSVSearchTool,
+    DirectoryReadTool,
+    FileReadTool,
+    FileWriterTool
+)
 from pydantic import BaseModel, Field
 
+# Load environment variables
 load_dotenv()
 
 OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "openai/gpt-4o-mini")
+ANTHROPIC_MODEL_NAME = os.getenv("ANTHROPIC_MODEL_NAME", "anthropic/claude-3-haiku-20240307")
 GOOGLE_MODEL_NAME = os.getenv("GOOGLE_MODEL_NAME", "gemini/gemini-2.0-flash")
 
 AGENT_MODEL = LLM(model=OPENAI_MODEL_NAME)
 PLANNING_MODEL = LLM(model=OPENAI_MODEL_NAME)
-MANAGER_MODEL = LLM(model="gpt-4o", temperature=0.1)
-
-print(f"Using Models:\n\tAgent Model:\t{AGENT_MODEL.model}\
-      \n\tPlanning Model:\t{PLANNING_MODEL.model}\
-      \n\tManager Model:\t{MANAGER_MODEL.model}")
+MANAGER_MODEL = LLM(model="gpt-4o-mini", temperature=0.1)
 
 
-csv_source = CSVKnowledgeSource(
-    file_paths=["data.csv"]
-)
+# === LLM CONFIGURATIONS ===
+AGENT_LLMS = {
+    "data_engineer": LLM(
+        model=OPENAI_MODEL_NAME,
+        temperature=0.2
+        ),
+    "data_analyst": LLM(
+        model=ANTHROPIC_MODEL_NAME,
+        temperature=0.4
+        ),
+    "model_builder": LLM(
+        model=OPENAI_MODEL_NAME,
+        temperature=0.3
+        ),
+    "insight_reporter": LLM(
+        model=ANTHROPIC_MODEL_NAME,
+        temperature=0.6
+        ),
+    "data_project_manager": LLM(
+        model=OPENAI_MODEL_NAME,
+        temperature=0.1
+        ),
+}
 
-#_______PYDANTIC OUTPUT_______
+print("\nUsing Models:")
+for role, llm in AGENT_LLMS.items():
+    print(f"\t{role}:\n\t\t{llm.model}\t(temp={llm.temperature})")
+
+# === GLOBAL PATHS & TOOLS ===
+DATA_FOLDER = "knowledge"
+FILE_NAME = "diabetes.csv"
+
+from pathlib import Path
+
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DATA_PATH = PROJECT_ROOT / DATA_FOLDER / FILE_NAME
+
+# pass *relative* path to the crew / tools
+RELATIVE_PATH = DATA_PATH.relative_to(PROJECT_ROOT)
+
+#PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+#DATA_PATH = os.path.join(PROJECT_ROOT, DATA_FOLDER, FILE_NAME)
+
+csv_source = CSVKnowledgeSource(file_paths=["diabetes.csv"])
+csv_search = CSVSearchTool(file_path=RELATIVE_PATH)
+code_interpreter = CodeInterpreterTool()
+directory_reader = DirectoryReadTool()
+file_reader = FileReadTool()
+file_writer = FileWriterTool()
+
+# === OUTPUT SCHEMAS ===
 class LoadDataOutput(BaseModel):
-    dataset_path: str
-    shape: Tuple[int, int]
-    columns: List[str]
-    dtype_map: Dict[str, str]
-    missing_values: Dict[str, int]
-
+    dataset_path: str = Field(description="Path to the loaded dataset")
+    # ⚠️  Fix: add `items` so OpenAI function schema is valid
+    shape: Tuple[int, int] = Field(
+        description="Shape of the dataset (rows, columns)",
+        json_schema_extra={
+            "items": {"type": "integer"},  # <— required by OpenAI
+            "minItems": 2,
+            "maxItems": 2,
+        },
+    )
+    columns: List[str] = Field(description="List of dataset columns")
+    dtype_map: Optional[Dict[str, str]] = Field(default=None, description="Data type for each column")
+    missing_values: Optional[Dict[str, int]] = Field(default=None, description="Count of missing values per column")
 
 class CleanedDataOutput(BaseModel):
-    cleaned_path: str
-    final_features: List[str]
-    categorical_features: List[str]
-    numeric_features: List[str]
-    dropped_columns: List[str]
-    imputation_summary: Dict[str, str]
+    cleaned_path: str = Field(description="Path to the cleaned dataset file")
+    final_features: List[str] = Field(description="List of features retained after cleaning")
+    categorical_features: List[str] = Field(description="List of identified categorical features")
+    numeric_features: List[str] = Field(description="List of identified numerical features")
+    dropped_columns: List[str] = Field(description="List of columns dropped during cleaning")
+    imputation_summary: Optional[Dict[str, str]] = Field(default=None, description="Summary of how missing values were handled")
 
+class FeatureCorrelation(BaseModel):
+    feature: str = Field(description="Feature name")
+    correlation: float = Field(description="Correlation coefficient with the target")
 
 class ExplorationOutput(BaseModel):
-    plot_paths: List[str]
-    top_correlations: List[Tuple[str, float]]
-    anomalies: List[str]
-    statistical_notes: str
-
+    plot_paths: List[str] = Field(description="Paths to saved plots from data exploration")
+    top_correlations: List[FeatureCorrelation] = Field(description="Top correlated features with the target")
+    anomalies: List[str] = Field(description="List of potential data anomalies")
+    statistical_notes: str = Field(description="Narrative summary of statistical insights")
 
 class FeatureSelectionOutput(BaseModel):
-    problem_type: Literal["classification", "regression"] = Field(
-        description="classification or regression"
-    )
-    top_features: List[str] = Field(
-        description="List of selected top features"
-    )
-    reasoning: str = Field(
-        description="Why these features and why this problem type"
-    )
-
+    problem_type: Literal["classification", "regression"] = Field(description="Inferred ML problem type")
+    top_features: List[str] = Field(description="List of selected top features")
+    reasoning: str = Field(description="Explanation for selected features and problem type")
 
 class ModelOutput(BaseModel):
-    model_type: str = Field(description="The type of model used, e.g., 'RandomForestClassifier'")
-    target: str = Field(description="The target variable the model is predicting")
-    feature_importance_path: str = Field(description="Path to the feature importance plot image file")
-    metrics: Dict[str, float] = Field(description="Model performance metrics such as accuracy, F1, R², or MSE")
-    confusion_matrix_path: Optional[str] = Field(
-        default=None,
-        description="Path to the confusion matrix plot (if classification task)"
-    )
-    plain_summary: str = Field(
-        description="Plain-language executive summary: 2–3 sentences summarizing model results and insights"
-    )
+    model_type: str = Field(description="Type of model used (e.g. RandomForestClassifier)")
+    target: str = Field(description="Target variable used for modeling")
+    feature_importance_path: str = Field(description="Path to saved feature importance plot")
+    metrics: Dict[str, float] = Field(description="Evaluation metrics (accuracy, R², etc.)")
+    confusion_matrix_path: Optional[str] = Field(default=None, description="Path to saved confusion matrix plot (if applicable)")
+    plain_summary: str = Field(description="Plain language summary of the model performance")
 
-#_______CREW_______
+# === CREW ===
 @CrewBase
 class DataAnalysisCrew():
-    """DataAnalysisCrew crew"""
-
     agents_config: Dict[str, Dict[str, Any]]
     tasks_config: Dict[str, Dict[str, Any]]
     agents: List[BaseAgent]
     tasks: List[Task]
 
-    code_interpreter = CodeInterpreterTool()
-    csv_search = CSVSearchTool()
-    directory_reader = DirectoryReadTool()
-    file_reader = FileReadTool()
-    file_writer = FileWriterTool()
-
-    ##___AGENTS___
     @agent
     def data_engineer(self) -> Agent:
         return Agent(
-            config=self.agents_config['data_engineer'],
-            llm=AGENT_MODEL,
-            tools=[
-                self.directory_reader,
-                self.csv_search,
-                self.code_interpreter,
-                self.file_reader,
-            ],
+            config=self.agents_config["data_engineer"],
+            llm=AGENT_LLMS["data_engineer"],
+            tools=[code_interpreter, file_reader, csv_search],
             max_execution_time=600,
             memory=True,
             verbose=True,
@@ -112,15 +144,15 @@ class DataAnalysisCrew():
             code_execution_mode="safe",
             reasoning=True,
             max_reasoning_attempts=3,
-            knowledge_sources=csv_source
+            knowledge_sources=[csv_source]
         )
 
     @agent
     def data_analyst(self) -> Agent:
         return Agent(
-            config=self.agents_config['data_analyst'],
-            llm=AGENT_MODEL,
-            tools=[self.code_interpreter],
+            config=self.agents_config["data_analyst"],
+            llm=AGENT_LLMS["data_analyst"],
+            tools=[code_interpreter],
             max_execution_time=600,
             memory=True,
             verbose=True,
@@ -128,36 +160,32 @@ class DataAnalysisCrew():
             code_execution_mode="safe",
             reasoning=True,
             max_reasoning_attempts=3,
-            allow_delegation=True
+            allow_delegation=True,
+            knowledge_sources=[csv_source]
         )
 
     @agent
     def model_builder(self) -> Agent:
         return Agent(
-            config=self.agents_config['model_builder'],
-            llm=AGENT_MODEL,
-            tools=[
-                self.code_interpreter,
-                self.csv_search
-            ],
+            config=self.agents_config["model_builder"],
+            llm=AGENT_LLMS["model_builder"],
+            tools=[code_interpreter, csv_search],
             allow_code_execution=True,
             code_execution_mode="safe",
             memory=True,
             verbose=True,
             reasoning=True,
             max_execution_time=600,
-            allow_delegation=True
+            allow_delegation=True,
+            knowledge_sources=[csv_source]
         )
 
     @agent
     def insight_reporter(self) -> Agent:
         return Agent(
-            config=self.agents_config['insight_reporter'],
-            llm=AGENT_MODEL,
-            tools=[
-                self.code_interpreter,
-                self.file_writer
-            ],
+            config=self.agents_config["insight_reporter"],
+            llm=AGENT_LLMS["insight_reporter"],
+            tools=[code_interpreter, file_writer],
             verbose=True,
             allow_code_execution=True,
             code_execution_mode="safe"
@@ -167,12 +195,12 @@ class DataAnalysisCrew():
     def data_project_manager(self) -> Agent:
         return Agent(
             config=self.agents_config["data_project_manager"],
-            llm=MANAGER_MODEL,
+            llm=AGENT_LLMS["data_project_manager"],
             verbose=True,
-            allow_code_execution=True
+            allow_code_execution=True,
+            max_reasoning_attempts=1
         )
 
-    ##___TASKS___
     @task
     def load_data(self) -> Task:
         return Task(
@@ -184,7 +212,7 @@ class DataAnalysisCrew():
     def clean_data(self) -> Task:
         return Task(
             config=self.tasks_config["clean_data"],
-            context=[self.load_data],
+            context=[self.load_data()],
             output_pydantic=CleanedDataOutput
         )
 
@@ -192,7 +220,7 @@ class DataAnalysisCrew():
     def explore_data(self) -> Task:
         return Task(
             config=self.tasks_config["explore_data"],
-            context=[self.clean_data],
+            context=[self.clean_data()],
             output_pydantic=ExplorationOutput
         )
 
@@ -200,7 +228,7 @@ class DataAnalysisCrew():
     def select_features(self) -> Task:
         return Task(
             config=self.tasks_config["select_features"],
-            context=[self.explore_data],
+            context=[self.explore_data()],
             output_pydantic=FeatureSelectionOutput
         )
 
@@ -208,7 +236,7 @@ class DataAnalysisCrew():
     def build_predictive_model(self) -> Task:
         return Task(
             config=self.tasks_config["build_predictive_model"],
-            context=[self.clean_data, self.select_features],
+            context=[self.clean_data(), self.select_features()],
             output_pydantic=ModelOutput
         )
 
@@ -216,20 +244,20 @@ class DataAnalysisCrew():
     def summarize_findings(self) -> Task:
         return Task(
             config=self.tasks_config["summarize_findings"],
-            context=[self.build_predictive_model]
+            context=[self.build_predictive_model()]
         )
 
-    ##___CREW___
     @crew
     def crew(self) -> Crew:
-        """Creates the DataAnalysisCrew crew"""
+        non_manager_agents = [
+            agent for agent in self.agents if agent != self.data_project_manager()
+        ]
         return Crew(
-            agents=self.agents,
+            agents=non_manager_agents,
             tasks=self.tasks,
             process=Process.hierarchical,
             planning=True,
-            manager_agent=self.data_project_manager,
-            #planning_llm=PLANNING_MODEL,
+            manager_agent=self.data_project_manager(),
             verbose=True,
             memory=True
         )
