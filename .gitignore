@@ -1,29 +1,26 @@
+# --- Secrets -------------------------------------------------
 .env
 
-# Python
+# --- Python byte-code & build artefacts ----------------------
 __pycache__/
-*.pyc
-*.pyo
-*.pyd
+*.py[cod]
 *.egg-info/
 
-# Virtual environments
+# --- Virtual environments -----------------------------------
 .venv/
 env/
 venv/
 datacrew/
 
-# Jupyter
-.ipynb_checkpoints
+# --- Jupyter -------------------------------------------------
+.ipynb_checkpoints/
 
-# VSCode
+# --- Editor / OS clutter ------------------------------------
 .vscode/
-
-# OS-specific
 .DS_Store
 
-# CrewAI outputs
-*.md
+# --- Generated outputs (safe to delete/recreate) ------------
 output/
 db/
 knowledge/
+*.md
