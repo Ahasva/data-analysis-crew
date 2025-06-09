@@ -1,64 +1,64 @@
 #!/usr/bin/env python
-import os
+"""
+Entry-point for the Data-Analysis Crew pipeline
+Run with  `crewai run`  or  `python -m data_analysis_crew.main`
+"""
 import sys
 import warnings
+import subprocess
+import webbrowser
+import time
 from pathlib import Path
 from data_analysis_crew.crew import DataAnalysisCrew
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
-# ⚑ this file lives in src/data_analysis_crew/main.py
-PROJECT_ROOT = Path(__file__).resolve().parents[2]   # jump two levels up
-DATA_PATH = PROJECT_ROOT / "knowledge" / "diabetes.csv"
+# ───────────────────────────────────────── paths ─────────────────────────────────────────
+PROJECT_ROOT  = Path(__file__).resolve().parents[2]
+DATA_FILE     = PROJECT_ROOT / "knowledge" / "diabetes.csv"
+REL_PATH_DATA = DATA_FILE.relative_to(PROJECT_ROOT)
 
-# pass *relative* path to the crew / tools
-RELATIVE_PATH = DATA_PATH.relative_to(PROJECT_ROOT)  
+OUTPUT_DIR = PROJECT_ROOT / "output"
+PLOTS_DIR  = OUTPUT_DIR / "plots"
+OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+PLOTS_DIR.mkdir(parents=True,  exist_ok=True)
 
-DATA_FOLDER = "knowledge"
-FILE_NAME = "diabetes.csv"
+DASHBOARD_PY = PROJECT_ROOT / "dashboard.py"
+if not DASHBOARD_PY.exists():
+    raise FileNotFoundError(f"dashboard.py expected at {DASHBOARD_PY}")
 
-PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-DATA_PATH = os.path.join(PROJECT_ROOT, DATA_FOLDER, FILE_NAME)
-SRC = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-
-OUTPUT_DIR = os.path.join(PROJECT_ROOT, "output")
-PLOTS_DIR = os.path.join(OUTPUT_DIR, "plots")
-
-# Ensure output dirs exist
-os.makedirs(OUTPUT_DIR, exist_ok=True)
-os.makedirs(PLOTS_DIR, exist_ok=True)
-
-# PROMPT
+# ───────────────────────────────────────── prompt ────────────────────────────────────────
 REQUEST = """
 What are the main factors for Diabetes?
 Which feature in the given data has the gravest impact on the patient,
 resulting in diabetes?
 """
 
-def run():
-    """
-    Run the full data analysis crew pipeline.
-    """
+# ─────────────────────────────────────── main helpers ─────────────────────────────────────
+def run() -> None:
+    """Run the full data-analysis crew pipeline."""
     inputs = {
-        "dataset_path": str(RELATIVE_PATH),
-        "request": REQUEST,
-        "output_dir": OUTPUT_DIR,
+        "dataset_path": str(REL_PATH_DATA),
+        "request"     : REQUEST,
+        "output_dir"  : str(OUTPUT_DIR),
     }
 
     try:
         crew = DataAnalysisCrew().crew()
-        print("\n🧭 Final Planned Task Order:")
-        for task in crew.tasks:
-            print(f"→ {task.agent.role}: {task.description[:50]}...")
+        print("\n🧭 Planned task order:")
+        for t in crew.tasks:
+            print(f"→ {t.agent.role:<22} : {t.description.splitlines()[0]}")
 
-        print("🧾 Dataset path being passed to agents:", inputs["dataset_path"])
-
+        print("🧾 Passing dataset:", inputs["dataset_path"])
         result = crew.kickoff(inputs=inputs)
-        print("\n✅ Analysis completed.")
-        return result
-    except Exception as e:
-        raise RuntimeError(f"[RUN ERROR] Failed to run the crew: {e}") from e
 
+        print("\n✅ Analysis completed.")
+        print("🌐  Opening dashboard...")
+
+        return result
+
+    except Exception as e:
+        raise RuntimeError(f"[RUN ERROR] Crew execution failed: {e}") from e
 
 def train():
     """
@@ -112,5 +112,14 @@ def test():
         raise RuntimeError(f"[TEST ERROR] Failed to test the crew: {e}") from e
 
 
+# ─────────────────────────────── script launch ───────────────────────────────
 if __name__ == "__main__":
     run()
+
+    # 🔥 auto-launch Streamlit dashboard
+    subprocess.Popen(["streamlit", "run", str(DASHBOARD_PY)])
+    time.sleep(3)
+    webbrowser.open_new("http://localhost:8501")
+    print("Dashboard launched 🚀  "
+          "(Ctrl-C here won't stop it; close the browser tab or "
+          "press Ctrl-C in the Streamlit terminal)")

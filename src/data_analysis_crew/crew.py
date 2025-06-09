@@ -1,5 +1,9 @@
+"""
+Orchestration of agentic AI crew
+"""
 import os
 from typing import Any, Dict, List, Literal, Optional, Tuple
+from pathlib import Path
 from dotenv import load_dotenv
 from crewai import Agent, Crew, Process, Task, LLM
 from crewai.project import CrewBase, agent, crew, task
@@ -13,6 +17,8 @@ from crewai_tools import (
     FileWriterTool
 )
 from pydantic import BaseModel, Field
+
+from data_analysis_crew.tools import build_predictive_model, launch_dashboard, load_or_clean
 
 # Load environment variables
 load_dotenv()
@@ -57,8 +63,6 @@ for role, llm in AGENT_LLMS.items():
 # === GLOBAL PATHS & TOOLS ===
 DATA_FOLDER = "knowledge"
 FILE_NAME = "diabetes.csv"
-
-from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DATA_PATH = PROJECT_ROOT / DATA_FOLDER / FILE_NAME
@@ -116,12 +120,45 @@ class FeatureSelectionOutput(BaseModel):
     reasoning: str = Field(description="Explanation for selected features and problem type")
 
 class ModelOutput(BaseModel):
-    model_type: str = Field(description="Type of model used (e.g. RandomForestClassifier)")
-    target: str = Field(description="Target variable used for modeling")
-    feature_importance_path: str = Field(description="Path to saved feature importance plot")
-    metrics: Dict[str, float] = Field(description="Evaluation metrics (accuracy, R², etc.)")
-    confusion_matrix_path: Optional[str] = Field(default=None, description="Path to saved confusion matrix plot (if applicable)")
-    plain_summary: str = Field(description="Plain language summary of the model performance")
+    # ── core info ───────────────────────────────────────────────────────
+    model_type: str = Field(
+        description="Sklearn class name of the trained model (e.g. RandomForestClassifier, SVR)."
+    )
+    problem_type: Literal["classification", "regression"] = Field(
+        description="Problem formulation inferred by the pipeline."
+    )
+    target: str = Field(
+        description="Name of the target column that was predicted."
+    )
+
+    # ── evaluation ──────────────────────────────────────────────────────
+    metrics: Dict[str, float] = Field(
+        description="Primary evaluation metrics. "
+                    "For classification: {'accuracy','f1'}; "
+                    "for regression: {'r2','mse'}."
+    )
+    plain_summary: str = Field(
+        description="Short one-liner summarising the metrics (shown on the dashboard card)."
+    )
+
+    # ── artefacts (optional because some models lack importances) ───────
+    feature_importance_path: Optional[str] = Field(
+        default=None,
+        description="Relative path to feature-importance PNG "
+                    "(may be None if not supported)."
+    )
+    secondary_plot_path: Optional[str] = Field(
+        default=None,
+        description="Relative path to the secondary plot: "
+                    "confusion_matrix.png (classification) or residuals.png (regression)."
+    )
+
+    # ── legacy alias for confusion matrix ───────────────────────────────
+    confusion_matrix_path: Optional[str] = Field(
+        default=None,
+        description="(DEPRECATED) alias of `secondary_plot_path` when "
+                    "`problem_type=='classification'`."
+    )
 
 # === CREW ===
 @CrewBase
@@ -136,7 +173,12 @@ class DataAnalysisCrew():
         return Agent(
             config=self.agents_config["data_engineer"],
             llm=AGENT_LLMS["data_engineer"],
-            tools=[code_interpreter, file_reader, csv_search],
+            tools=[
+                code_interpreter,
+                file_reader,
+                csv_search,
+                load_or_clean
+            ],
             max_execution_time=600,
             memory=True,
             verbose=True,
@@ -169,7 +211,11 @@ class DataAnalysisCrew():
         return Agent(
             config=self.agents_config["model_builder"],
             llm=AGENT_LLMS["model_builder"],
-            tools=[code_interpreter, csv_search],
+            tools=[
+                code_interpreter,
+                csv_search,
+                build_predictive_model,
+            ],
             allow_code_execution=True,
             code_execution_mode="safe",
             memory=True,
@@ -185,7 +231,11 @@ class DataAnalysisCrew():
         return Agent(
             config=self.agents_config["insight_reporter"],
             llm=AGENT_LLMS["insight_reporter"],
-            tools=[code_interpreter, file_writer],
+            tools=[
+                code_interpreter,
+                file_writer,
+                launch_dashboard
+            ],
             verbose=True,
             allow_code_execution=True,
             code_execution_mode="safe"
@@ -198,6 +248,7 @@ class DataAnalysisCrew():
             llm=AGENT_LLMS["data_project_manager"],
             verbose=True,
             allow_code_execution=True,
+            code_execution_mode="safe",
             max_reasoning_attempts=1
         )
 
@@ -237,7 +288,7 @@ class DataAnalysisCrew():
         return Task(
             config=self.tasks_config["build_predictive_model"],
             context=[self.clean_data(), self.select_features()],
-            output_pydantic=ModelOutput
+            output_json=ModelOutput
         )
 
     @task
@@ -247,6 +298,12 @@ class DataAnalysisCrew():
             context=[self.build_predictive_model()]
         )
 
+    @task
+    def launch_dashboard(self) -> Task:
+        return Task(
+            config=self.tasks_config["launch_dashboard"],
+            context=[self.summarize_findings()]
+        )
     @crew
     def crew(self) -> Crew:
         non_manager_agents = [

@@ -1,44 +1,44 @@
+"""
+Tool for cleaning the dataset
+"""
 # --- clean_data.py -----------------------------------------------------------
 from pathlib import Path
 import pandas as pd
-
-RAW_PATH     = Path("knowledge/diabetes.csv")
-CLEAN_PATH   = Path("knowledge/diabetes_cleaned.csv")
+from crewai.tools import tool
 
 # ---------------------------------------------------------------------
-def load_or_clean(raw_path: Path, cleaned_path: Path) -> pd.DataFrame:
+@tool("load_or_clean")
+def load_or_clean(
+    raw_path: str = "knowledge/diabetes.csv",
+    cleaned_path: str = "knowledge/diabetes_cleaned.csv",
+) -> dict:
     """
     – If cleaned_path exists → load & return (no re-processing).
-    – Else → read raw_path, normalise columns, clean, save & return.
+    – Else → read raw_path, normalize column names, save & return.
     """
-    if cleaned_path.exists():
-        df = pd.read_csv(cleaned_path)
-        print(f"✔ Re-using cached clean file: {cleaned_path}")
-        return df
 
-    # ---------- minimal cleaning example ----------
-    df = pd.read_csv(raw_path)
-    df.columns = (
-        df.columns.str.strip()      # remove leading/trailing spaces
-                 .str.lower()
-                 .str.replace(" ", "_")
-    )
-    # (Add your imputation / dropping / dtype fixes here)
-    df.to_csv(cleaned_path, index=False)
-    print(f"💾 Saved cleaned file to: {cleaned_path}")
-    return df
-# ---------------------------------------------------------------------
+    raw   = Path(raw_path)
+    clean = Path(cleaned_path)
 
-df_load_or_clean = load_or_clean(RAW_PATH, CLEAN_PATH)
+    # load or clean
+    if clean.exists():
+        df = pd.read_csv(clean)
+    else:
+        df = pd.read_csv(raw)
+        df.columns = (
+            df.columns
+              .str.strip()
+              .str.lower()
+              .str.replace(" ", "_")
+        )
+        df.to_csv(clean, index=False)
 
-# Collect the metadata your Pydantic model expects
-output = {
-    "cleaned_path": str(CLEAN_PATH),
-    "final_features": df_load_or_clean.columns.tolist(),
-    "categorical_features": [],   #  <- fill if you detect them
-    "numeric_features": df_load_or_clean.select_dtypes("number").columns.tolist(),
-    "dropped_columns": [],        #  <- add any you removed
-    "imputation_summary": None    #  <- or a dict of {col:method}
-}
-print(output["cleaned_path"])      # <-- **Option 1: always print for the tool**
-print(output)                      # optional: shows the rest for logs
+    # assemble exactly the fields required by CleanedDataOutput
+    return {
+        "cleaned_path"        : str(clean),
+        "final_features"      : df.columns.tolist(),
+        "categorical_features": [],  # fill if you detect any
+        "numeric_features"    : df.select_dtypes("number").columns.tolist(),
+        "dropped_columns"     : [],  # list any dropped columns
+        "imputation_summary"  : None
+    }

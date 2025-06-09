@@ -1,170 +1,253 @@
+# ---------------------------------------------------------------------------
+#  1  LOAD ──────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 load_data:
   description: >
-    Load the CSV dataset using the exact path provided in `{dataset_path}`.
-    ⚠️ Do NOT attempt to search or list any directories.
-    
-    Use pandas to:
-    - Load the dataset from the given path
-    - Print the dataset shape and column names
-    - Report missing values and inferred column types
-    - Save a snapshot CSV if any changes were applied
+    Load the CSV dataset using the exact *literal* path in `{dataset_path}`.
+    ⚠️ Do **not** search or list directories.
 
-    Dataset Path: {dataset_path}
+    Use pandas to:
+      • read the file  
+      • `print()` shape and column names  
+      • report missing-value counts and inferred dtypes  
+
+    Dataset Path (string): **{dataset_path}**
   expected_output: >
-    A summary report including:
-    - Dataset shape
-    - List of column names and inferred data types (as dtype_map)
-    - Count of missing values per column (as missing_values)
-    - Save path of the loaded dataset file (if modified)
+    - Dataset shape  
+    - `dtype_map` (column → dtype)  
+    - `missing_values` (column → #missing)  
+    - Path actually read/written
   agent: data_engineer
 
+# ---------------------------------------------------------------------------
+#  2  CLEAN ─────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 clean_data:
   description: >
-    Clean and preprocess the raw dataset previously loaded.
+    Tidy up the raw dataset.
 
-    - If **knowledge/diabetes_cleaned.csv** already exists, just load it,
-      collect metadata, and return the path – **do not re-clean**.  
-    - Otherwise:  
-        • Read **knowledge/diabetes.csv**  
-        • Normalise column names to lower-snake-case  
-        • Handle missing values, drop constants, etc.  
-        • Save the result as **knowledge/diabetes_cleaned.csv**  
-    - Always `print()` the cleaned file path as the *first* line of
-      stdout so the Code-Interpreter tool can capture it.
+    • Call the tool:
+      `load_or_clean(raw_path="{dataset_path}", cleaned_path="knowledge/diabetes_cleaned.csv")`
+    • If the cleaned file exists, it’ll be re-used.
+    • If **knowledge/diabetes_cleaned.csv** exists → just load it, gather
+      metadata, and return – **do not** re-clean.  
+    • Else → read **knowledge/diabetes.csv**, normalise column names
+      (lower-snake-case), fix missing values / constants, then save to the
+      same cleaned path.
 
-    Use the helper:
+    Always `print()` the cleaned file path as **the first line of STDOUT** so
+    the Code-Interpreter tool captures it.
+
+    Helper available:
 
     ```python
     from data_analysis_crew.tools import load_or_clean
-    df = load_or_clean()
+    df = load_or_clean()            # ← re-uses cache or cleans afresh
     ```
 
-    After that, assemble and return all fields required by
-    **CleanedDataOutput** (cleaned_path, final_features,
-    numeric_features, categorical_features, dropped_columns,
-    imputation_summary).
-
+    After cleaning assemble the `CleanedDataOutput` fields:
+      • cleaned_path  
+      • final_features / numeric_features / categorical_features  
+      • dropped_columns / imputation_summary
   expected_output: >
-    • First line printed = absolute or relative path to
-      **knowledge/diabetes_cleaned.csv**  
-    • Plus a Markdown summary containing:  
-        – Cleaning steps taken  
-        – Final feature list with dtypes  
-        – Missing-value summary after cleaning  
-
+    1  First STDOUT line → `knowledge/diabetes_cleaned.csv`  
+    2  Markdown block:
+       – cleaning steps  
+       – final feature × dtype table  
+       – post-clean missing-value summary
   agent: data_engineer
   context: [load_data]
 
+# ---------------------------------------------------------------------------
+#  3  EXPLORE ────────────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 explore_data:
   description: >
     Perform an exploratory analysis of the cleaned dataset.
 
-    Dataset Path: `cleaned_path`
-    Numeric Features: `numeric_features`
-    Categorical Features: `categorical_features`
-    Output Directory: {output_dir}
+    Inputs (already in context):
+      • Cleaned file → `cleaned_path`  
+      • Numeric cols → `numeric_features`  
+      • Categorical → `categorical_features`
+
+    When you call the Code Interpreter, include
+    {
+      "code": "
+    import pandas as pd
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    from pathlib import Path
+
+    df = pd.read_csv('knowledge/diabetes_cleaned.csv')
+
+    # 1) Descriptive statistics
+    stats = df.describe().to_string()
+    print(stats)
+
+    # 2) Example plot directory
+    plots_dir = Path('output/plots'); plots_dir.mkdir(parents=True, exist_ok=True)
+
+    # Histogram for each numeric column
+    for col in df.select_dtypes('number').columns:
+        df[col].hist()
+        plt.title(col)
+        filename = "{}_hist.png".format(col)
+        plt.savefig(plots_dir / filename)
+        plt.clf()
+
+    # 3) Correlation heat-map
+    plt.figure(figsize=(8,6))
+    sns.heatmap(df.corr(), annot=True, cmap='coolwarm')
+    plt.tight_layout()
+    heat_path = plots_dir / 'correlation_heatmap.png'
+    plt.savefig(heat_path)
+    print("Heat-map saved → {}".format(heat_path))
+
+    # ALWAYS finish with a print so the tool
+    # has something to capture as “final result”
+    print('EDA script finished')
+    ",
+      "libraries_used": ["pandas", "matplotlib", "seaborn"]
+    }.
 
     Tasks:
-    - Calculate descriptive statistics
-    - Visualize distributions and relationships
-    - Identify top correlations and potential outliers
+      1. Descriptive statistics (`df.describe()`; include categoricals)  
+      2. Visualise distributions / relationships  
+      3. Compute correlation matrix, list the top correlations with the target,
+         flag outliers & anomalies.
 
-    Save at least 3 plots to {output_dir}/plots.
+    You **must** save **≥ 3** PNGs into **{output_dir}/plots/**.
   expected_output: >
-    A Markdown report with:
-    - At least 3 plots saved to {output_dir}/plots
-    - A table of top correlations with the target
-    - Notes on potential biases, anomalies, or outliers
+    Markdown report with:
+      • embeds / links for the saved plots  
+      • table of top correlations  
+      • notes on anomalies / biases / outliers
   agent: data_analyst
   context: [clean_data]
 
+# ---------------------------------------------------------------------------
+#  4  FEATURE SELECTION ──────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 select_features:
   description: >
-    From the prior exploratory analysis, select the most important features related to the question:
+    Select the strongest predictors for:
 
-    {request}
+        {request}
 
-    Use the following inputs:
-    - Correlation Matrix: `top_correlations`
-    - Statistical Notes: `statistical_notes`
+    Use:
+      • `top_correlations` (from EDA)  
+      • `statistical_notes`
 
-    Also determine whether the prediction target is:
-    - Categorical → classification
-    - Numeric → regression
+    Decide whether the prediction target is categorical or numeric:
+      → return `"classification"` or `"regression"`.
 
-    Return:
-    - A list of selected features
-    - Inferred problem type
-    - Explanation for choices
+    Deliver:
+      • `top_features` – list & rationale  
+      • `problem_type` – classification / regression (+ why)
   expected_output: >
-    A Markdown summary with:
-    - A list of top features with brief justification
-    - The inferred problem type ("classification" or "regression")
-    - Justification for problem type choice
+    Markdown brief:
+      – chosen features + justification  
+      – inferred problem type + explanation
   agent: data_analyst
   context: [explore_data]
 
+# ---------------------------------------------------------------------------
+#  5  MODEL BUILDING ────────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 build_predictive_model:
   description: >
-    Use the cleaned dataset to train a predictive model.
+    Train a model on the cleaned dataset and save every artefact the
+    dashboard needs.
 
-    Dataset Path: `cleaned_path`
-    Features: `top_features`
-    Problem Type: `problem_type`
-    Request: {request}
-    Output Directory: {output_dir}
+    **Call the helper tool**  
+      `build_predictive_model(df, out_dir="{output_dir}", problem_type=problem_type)`  
+    that lives in **data_analysis_crew.tools**.
 
-    Task:
-    - If classification, use RandomForestClassifier
-    - If regression, use RandomForestRegressor
+    The tool will:
+      • train an appropriate model  
+      • save `output/model-report.json`  
+      • save plots to `output/plots/`  
+      • write `output/final-insight-summary.md`
 
-    Split data, train the model, evaluate using:
-    - Accuracy, F1 Score (for classification)
-    - R², MSE (for regression)
+    Ensure the dashboard can find everything (all paths **relative**).
 
-    Save:
-    - Feature importance plot to {output_dir}/plots/feature_importances.png
-    - Confusion matrix if applicable
+    Only hand-code training (i.e. build ML models), if the invoked tool does not work
+    or does not lead to meaningful, data-related insights.
+    Usually invoking the helper tool (build_predictive_model) is enough.
+
+    Example for metrics:
+    • If `problem_type == classification` → `RandomForestClassifier`  
+      (report *accuracy* & *F1*).  
+    • Else → `RandomForestRegressor`  
+      (report *R²* & *MSE*).
+    Be explicit and use metrics, if it makes sense. 
+
+    Required outputs (all **relative paths**) in `{output_dir}`:
+
+      ┌ output/model-report.json
+      │   ├─ model_type
+      │   ├─ target
+      │   ├─ metrics {accuracy/F1 or R²/MSE}
+      │   ├─ plain_summary      (one-liner for the dashboard)
+      │   ├─ feature_importance_path   →  plots/feature_importances.png
+      │   └─ confusion_matrix_path     →  plots/confusion_matrix.png
+      └ output/plots/
+          ├─ feature_importances.png
+          └─ confusion_matrix.png      (only for classifiers)
+
+    **Important**: create the `output/plots/` directory when missing.
+
+    Also write a short Markdown block to `output/final-insight-summary.md`
+    embedding the *relative* feature-importance image.
   expected_output: >
-    A Markdown report with:
-    - Final metrics (accuracy/F1 or R²/MSE)
-    - A plot of feature importances saved to {output_dir}/plots/feature_importances.png
-    - Summary table of training results
-    Formatted as markdown without "```"
+    - A brief Markdown summary with final metrics and the plot.
+    - `output/model-report.json` (with metrics, paths, summary).  
+    - `output/plots/feature_importances.png` (+ `confusion_matrix.png` if cls).
+    - Short Markdown summary in `output/final-insight-summary.md` with all meaningful insight, metrics and plots.
   agent: model_builder
   context: [clean_data, select_features]
   output_file: output/model-report.json
 
+
+
+# ---------------------------------------------------------------------------
+#  6  EXECUTIVE SUMMARY ─────────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
 summarize_findings:
   description: >
-    Write a high-level executive summary of the analysis.
+    Craft an executive-level summary for non-technical stakeholders.
 
-    Model: `model_type`
-    Metrics: `metrics`
-    Feature Importances: ![Feature Importances](`feature_importance_path`)
+    Use:
+      • `model_type`, `metrics`, `feature_importance_path`  
+      • earlier narratives if useful.
 
-    Focus on:
-    - Key features that influence the outcome
-    - Interpretation of model performance
-    - Actionable business insights
+    Must include:
+      • 2-3 sentence plain-language overview  
+      • 3-5 bullet key insights  
+      • a one-sentence recommendation  
+      • embedded feature-importance image:
 
-    Add a plain-language executive summary for non-technical stakeholders:
-    - Explain what the model does in 2–3 sentences
-    - Clearly state what feature(s) matter most
-    - Describe the model's confidence and limitations
-    - Provide a single-sentence recommendation based on findings
-
-    Include 3–5 bullet points and a final recommendation section.
-    Include a visual:
-    ![Feature Importances](plots/feature_importances.png)
-
+          ![Feature Importances](`feature_importance_path`)
   expected_output: >
-    A Markdown executive summary with:
-    - A plain-language summary for executives (2–3 sentences)
-    - 3–5 bullet points highlighting key insights
-    - A conclusion section with takeaways and a recommendation
-    - Embedded plot image(s)
-    - Highlight any assumptions or limitations
+    Markdown file `output/final-insight-summary.md` with all of the above.
   agent: insight_reporter
   context: [build_predictive_model]
   output_file: output/final-insight-summary.md
+
+
+# ---------------------------------------------------------------------------
+#  7  LAUNCH DASHBOARD 🚀 ───────────────────────────────────────────────────
+# ---------------------------------------------------------------------------
+launch_dashboard:
+  description: >
+    Spin-up the Streamlit dashboard (dashboard.py) **after** the executive
+    summary is written.  
+    Steps  
+      • run:  streamlit run dashboard.py  
+      • wait 3 s, then open the browser on http://localhost:8501  
+      • return a short confirmation string
+  expected_output: >
+    A message confirming the dashboard URL, e.g.:
+    "Dashboard launched on http://localhost:8501"
+  agent: data_project_manager
+  context: [summarize_findings]

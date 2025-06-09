@@ -21,10 +21,11 @@ dependencies = [
 
 # --- CLI entry-points -------------------------------------------------------
 [project.scripts]
-run_crew  = "data_analysis_crew.main:run"
-train     = "data_analysis_crew.main:train"
-replay    = "data_analysis_crew.main:replay"
-test      = "data_analysis_crew.main:test"
+run_crew      = "data_analysis_crew.main:run"
+train         = "data_analysis_crew.main:train"
+replay        = "data_analysis_crew.main:replay"
+test          = "data_analysis_crew.main:test"
+run_dashboard = "dashboard:__main__"
 
 # --- Optional / dev extras --------------------------------------------------
 [project.optional-dependencies]
