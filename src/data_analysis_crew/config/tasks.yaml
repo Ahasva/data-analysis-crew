@@ -123,7 +123,7 @@ explore_data:
       • table of top correlations  
       • notes on anomalies / biases / outliers
   agent: data_analyst
-  context: [clean_data]
+  context: [] # alternative: clean_data
 
 # ---------------------------------------------------------------------------
 #  4  FEATURE SELECTION ──────────────────────────────────────────────────────
@@ -156,58 +156,49 @@ select_features:
 # ---------------------------------------------------------------------------
 build_predictive_model:
   description: >
-    Train a model on the cleaned dataset and save every artefact the
-    dashboard needs.
+    Train a predictive model using the cleaned dataset. 
+    Save all required artefacts for downstream analysis and dashboard display.
 
-    **Call the helper tool**  
-      `build_predictive_model(df, out_dir="{output_dir}", problem_type=problem_type)`  
-    that lives in **data_analysis_crew.tools**.
+    **Tool to call**:  
+    `build_predictive_model(df, out_dir="{output_dir}", problem_type=problem_type)`
 
-    The tool will:
-      • train an appropriate model  
-      • save `output/model-report.json`  
-      • save plots to `output/plots/`  
-      • write `output/final-insight-summary.md`
+    ✅ You must choose an appropriate model:
+      Available options:
+        - "random_forest"
+        - "logistic_reg"
+        - "svm"
+        - "knn"
+        - "gbt"
+        - "linear_reg"
 
-    Ensure the dashboard can find everything (all paths **relative**).
+      Example logic:
+        - Logistic Regression → binary, low-dimensional problems  
+        - Random Forest / GBT → non-linear, interpretable  
+        - SVM → high feature count vs. samples  
+        - KNN → small datasets  
 
-    Only hand-code training (i.e. build ML models), if the invoked tool does not work
-    or does not lead to meaningful, data-related insights.
-    Usually invoking the helper tool (build_predictive_model) is enough.
+    👉 Use `model_name="..."` explicitly in your call.
 
-    Example for metrics:
-    • If `problem_type == classification` → `RandomForestClassifier`  
-      (report *accuracy* & *F1*).  
-    • Else → `RandomForestRegressor`  
-      (report *R²* & *MSE*).
-    Be explicit and use metrics, if it makes sense. 
+    📊 The tool will:
+      - Train the model  
+      - Save:
+        • `output/model-report.json` (with type, target, metrics, plots, summary)  
+        • `output/technical-metrics.md`  
+        • Plots into `output/plots/`
 
-    Required outputs (all **relative paths**) in `{output_dir}`:
+    🛑 Do **not** hand-code model training unless the helper fails.
 
-      ┌ output/model-report.json
-      │   ├─ model_type
-      │   ├─ target
-      │   ├─ metrics {accuracy/F1 or R²/MSE}
-      │   ├─ plain_summary      (one-liner for the dashboard)
-      │   ├─ feature_importance_path   →  plots/feature_importances.png
-      │   └─ confusion_matrix_path     →  plots/confusion_matrix.png
-      └ output/plots/
-          ├─ feature_importances.png
-          └─ confusion_matrix.png      (only for classifiers)
-
-    **Important**: create the `output/plots/` directory when missing.
-
-    Also write a short Markdown block to `output/final-insight-summary.md`
-    embedding the *relative* feature-importance image.
+    Required output files (all relative):
+      - `output/model-report.json`  
+      - `output/plots/feature_importances.png`  
+      - `output/plots/confusion_matrix.png` (only for classification)  
+      - `output/technical-metrics.md`
   expected_output: >
-    - A brief Markdown summary with final metrics and the plot.
     - `output/model-report.json` (with metrics, paths, summary).  
     - `output/plots/feature_importances.png` (+ `confusion_matrix.png` if cls).
-    - Short Markdown summary in `output/final-insight-summary.md` with all meaningful insight, metrics and plots.
+    - `output/technical-metrics.md`
   agent: model_builder
   context: [clean_data, select_features]
-  output_file: output/model-report.json
-
 
 
 # ---------------------------------------------------------------------------
@@ -218,16 +209,16 @@ summarize_findings:
     Craft an executive-level summary for non-technical stakeholders.
 
     Use:
-      • `model_type`, `metrics`, `feature_importance_path`  
-      • earlier narratives if useful.
+      - `model_type`, `metrics`, `feature_importance_path`, 
+      `output/technical-metrics.md` (from model_builder).
+      - earlier narratives and outputs if helpful.
 
     Must include:
-      • 2-3 sentence plain-language overview  
-      • 3-5 bullet key insights  
-      • a one-sentence recommendation  
-      • embedded feature-importance image:
-
-          ![Feature Importances](`feature_importance_path`)
+      - 2-3 sentence plain-language overview  
+      - 3-5 bullet key insights  
+      - a one-sentence recommendation  
+      - embedded feature-importance image:
+          ![Feature Importances](plots/feature_importances.png)
   expected_output: >
     Markdown file `output/final-insight-summary.md` with all of the above.
   agent: insight_reporter
@@ -240,14 +231,19 @@ summarize_findings:
 # ---------------------------------------------------------------------------
 launch_dashboard:
   description: >
-    Spin-up the Streamlit dashboard (dashboard.py) **after** the executive
-    summary is written.  
-    Steps  
-      • run:  streamlit run dashboard.py  
-      • wait 3 s, then open the browser on http://localhost:8501  
-      • return a short confirmation string
+    Launch the Streamlit dashboard.
+
+    Call this inside the Code Interpreter:
+    ```python
+    import subprocess, time, webbrowser
+
+    subprocess.Popen(["streamlit", "run", "dashboard.py"])
+    time.sleep(3)
+    webbrowser.open("http://localhost:8501")
+    print("Dashboard launched on http://localhost:8501")
+    ```
   expected_output: >
     A message confirming the dashboard URL, e.g.:
     "Dashboard launched on http://localhost:8501"
-  agent: data_project_manager
+  agent: insight_reporter
   context: [summarize_findings]

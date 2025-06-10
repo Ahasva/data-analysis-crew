@@ -40,15 +40,15 @@ AGENT_LLMS = {
         ),
     "data_analyst": LLM(
         model=ANTHROPIC_MODEL_NAME,
-        temperature=0.4
+        temperature=0.3
         ),
     "model_builder": LLM(
         model=OPENAI_MODEL_NAME,
-        temperature=0.3
+        temperature=0.2
         ),
     "insight_reporter": LLM(
         model=ANTHROPIC_MODEL_NAME,
-        temperature=0.6
+        temperature=0.3
         ),
     "data_project_manager": LLM(
         model=OPENAI_MODEL_NAME,
@@ -179,13 +179,13 @@ class DataAnalysisCrew():
                 csv_search,
                 load_or_clean
             ],
-            max_execution_time=600,
+            max_execution_time=180,
             memory=True,
             verbose=True,
             allow_code_execution=True,
             code_execution_mode="safe",
             reasoning=True,
-            max_reasoning_attempts=3,
+            max_reasoning_attempts=2,
             knowledge_sources=[csv_source]
         )
 
@@ -195,14 +195,14 @@ class DataAnalysisCrew():
             config=self.agents_config["data_analyst"],
             llm=AGENT_LLMS["data_analyst"],
             tools=[code_interpreter],
-            max_execution_time=600,
+            max_execution_time=180,
             memory=True,
             verbose=True,
             allow_code_execution=True,
             code_execution_mode="safe",
             reasoning=True,
-            max_reasoning_attempts=3,
-            allow_delegation=True,
+            max_reasoning_attempts=2,
+            allow_delegation=False,
             knowledge_sources=[csv_source]
         )
 
@@ -221,8 +221,8 @@ class DataAnalysisCrew():
             memory=True,
             verbose=True,
             reasoning=True,
-            max_execution_time=600,
-            allow_delegation=True,
+            max_execution_time=360,
+            allow_delegation=False,
             knowledge_sources=[csv_source]
         )
 
@@ -236,9 +236,12 @@ class DataAnalysisCrew():
                 file_writer,
                 launch_dashboard
             ],
-            verbose=True,
             allow_code_execution=True,
-            code_execution_mode="safe"
+            code_execution_mode="safe",
+            memory=True,
+            verbose=True,
+            max_execution_time=180,
+            max_reasoning_attempts=2
         )
 
     @agent
@@ -246,10 +249,13 @@ class DataAnalysisCrew():
         return Agent(
             config=self.agents_config["data_project_manager"],
             llm=AGENT_LLMS["data_project_manager"],
-            verbose=True,
-            allow_code_execution=True,
+            allow_code_execution=False,
             code_execution_mode="safe",
-            max_reasoning_attempts=1
+            memory=True,
+            verbose=True,
+            reasoning=True,
+            max_reasoning_attempts=1,
+            allow_delegation=True
         )
 
     @task
@@ -271,8 +277,9 @@ class DataAnalysisCrew():
     def explore_data(self) -> Task:
         return Task(
             config=self.tasks_config["explore_data"],
-            context=[self.clean_data()],
-            output_pydantic=ExplorationOutput
+            context=[], # alternative: self.clean_data()
+            output_pydantic=ExplorationOutput,
+            async_execution=True,
         )
 
     @task
@@ -288,14 +295,16 @@ class DataAnalysisCrew():
         return Task(
             config=self.tasks_config["build_predictive_model"],
             context=[self.clean_data(), self.select_features()],
-            output_json=ModelOutput
+            output_json=ModelOutput,
+            output_file="output/model-report.json"
         )
 
     @task
     def summarize_findings(self) -> Task:
         return Task(
             config=self.tasks_config["summarize_findings"],
-            context=[self.build_predictive_model()]
+            context=[self.build_predictive_model()],
+            output_file="output/final-insight-summary.md"
         )
 
     @task
