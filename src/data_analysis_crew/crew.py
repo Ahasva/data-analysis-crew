@@ -325,5 +325,6 @@ class DataAnalysisCrew():
             planning=True,
             manager_agent=self.data_project_manager(),
             verbose=True,
-            memory=True
+            memory=True,
+            output_log_file="output/crew_log.json"
         )

@@ -2,11 +2,11 @@
 Tool for model builder agent to properly create ML models
 """
 # ── src/data_analysis_crew/tools/build_predictive_model_tool.py ──────────────
-from __future__ import annotations
+#from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Union
 
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -74,14 +74,18 @@ def _get_importances(model, X_test, y_test, random_state: int = 42):
 # --------------------------------------------------------------------------- #
 #  Main tool                                                                  #
 # --------------------------------------------------------------------------- #
+
+DataInput = Union[pd.DataFrame, str, Path]
+PathInput = Union[str, Path]
+
 @tool("build_predictive_model")
 def build_predictive_model(
-    data: pd.DataFrame | str | Path,
+    data: DataInput,
     *,
     target: str = "outcome",
-    problem_type: str | None = None,
-    model_name: str | None = None,
-    out_dir: str | Path = "output",
+    problem_type: Union[str, None] = None,
+    model_name: Union[str, None] = None,
+    out_dir: PathInput = "output",
     **model_kwargs,
 ) -> dict:
     """
@@ -254,6 +258,3 @@ def build_predictive_model(
 
     print("✅ Model built and artefacts saved")
     return report
-
-# ── force Pydantic to resolve any forward refs ─────────────────────────────
-build_predictive_model.model_rebuild()

@@ -1,31 +1,34 @@
-# dashboard.py  ──────────────────────────────────────────────────────────────
+# ======= dashboard.py ======================================================
 """
 Streamlit dashboard for the Data-Analysis-Crew outputs.
 Run with   streamlit run dashboard.py
 (or let main.py open it automatically after the crew finishes).
 """
+import sys
 from pathlib import Path
 import json
 import streamlit as st
+import streamlit.web.cli as stcli
 
-# ───────────────────────── paths ─────────────────────────
+
+# ======= paths ==============================================================
 OUTPUT_DIR   = Path("output")
 REPORT_MD    = OUTPUT_DIR / "final-insight-summary.md"
 REPORT_JSON  = OUTPUT_DIR / "model-report.json"
 PLOTS_DIR    = OUTPUT_DIR / "plots"           # kept for completeness
 
-# ──────────────────────── page config ────────────────────
+# ======= page config ========================================================
 st.set_page_config(page_title="Data Analysis Dashboard", layout="wide")
 st.title("📊 Data-Analysis Crew Report")
 
-# ═════════════════════ Executive summary ═════════════════════
+# ======= Executive summary ==================================================
 st.header("📋 Executive Summary")
 if REPORT_MD.exists():
     st.markdown(REPORT_MD.read_text(), unsafe_allow_html=True)
 else:
     st.warning("Executive summary not found (expected at `output/final-insight-summary.md`).")
 
-# ═════════════════════ Model report ═════════════════════
+# ======= Model report =======================================================
 st.header("🤖 Model Report")
 
 model_data = {}
@@ -48,7 +51,7 @@ if REPORT_JSON.exists():
 else:
     st.warning("`model-report.json` not found in `output/`.")
 
-# ═════════════════════ Visualisations ═════════════════════
+# ======= Visualisations ======================================================
 st.header("🖼️ Visualisations")
 
 feature_plot = model_data.get("feature_importance_path")
@@ -64,7 +67,7 @@ if conf_matrix and Path(conf_matrix).exists():
     st.subheader("📉 Confusion Matrix")
     st.image(conf_matrix, caption="Confusion Matrix", use_column_width=True)
 
-# ═════════════════════ Downloads ═════════════════════
+# ======= Downloads =======
 st.header("📂 Download Outputs")
 col_dl1, col_dl2 = st.columns(2)
 with col_dl1:
@@ -78,8 +81,7 @@ with col_dl2:
                            REPORT_JSON.read_bytes(),
                            file_name="model-report.json")
 
-# ─────────────────── allow `python dashboard.py` ───────────────────
-if __name__ == "__main__":
-    import sys, streamlit.web.cli as stcli
+# ======= allow `python dashboard.py` ==========================================
+if __name__ == "__main__" and not st.runtime.exists():
     sys.argv = ["streamlit", "run", __file__]
     stcli.main()
