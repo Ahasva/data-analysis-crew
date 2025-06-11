@@ -1,7 +1,7 @@
 """
 Tool for reporting agent for launching the Streamlit dashboard
 """
-# ───────────────────────────── launch_dashboard_tool.py ─────────────────────────────
+# ───────────────────────────── dashboard_launcher_tool.py ─────────────────────────────
 from pathlib import Path
 import subprocess
 import webbrowser
@@ -9,7 +9,7 @@ import time
 from crewai.tools import tool
 
 
-@tool("Launch Dashboard")
+@tool("Launch dashboard via Streamlit")
 def launch_dashboard(path: str = "dashboard.py", port: int = 8501) -> str:
     """
     Start the Streamlit dashboard and open it in the browser.

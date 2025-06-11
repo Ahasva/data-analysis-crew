@@ -18,7 +18,7 @@ from crewai_tools import (
 )
 from pydantic import BaseModel, Field
 
-from data_analysis_crew.tools import build_predictive_model, launch_dashboard, load_or_clean
+from data_analysis_crew.tools import build_predictive_model, launch_dashboard, load_or_clean, install_dependency
 
 # Load environment variables
 load_dotenv()
@@ -147,11 +147,10 @@ class ModelOutput(BaseModel):
         description="Relative path to feature-importance PNG "
                     "(may be None if not supported)."
     )
-    secondary_plot_path: Optional[str] = Field(
-        default=None,
-        description="Relative path to the secondary plot: "
-                    "confusion_matrix.png (classification) or residuals.png (regression)."
-    )
+    secondary_plot_paths: Optional[List[str]] = Field(
+    default=None,
+    description="List of paths to additional plots like ROC, PR, residuals, etc."
+)
 
     # ── legacy alias for confusion matrix ───────────────────────────────
     confusion_matrix_path: Optional[str] = Field(
@@ -175,6 +174,7 @@ class DataAnalysisCrew():
             llm=AGENT_LLMS["data_engineer"],
             tools=[
                 code_interpreter,
+                install_dependency,
                 file_reader,
                 csv_search,
                 load_or_clean
@@ -194,7 +194,10 @@ class DataAnalysisCrew():
         return Agent(
             config=self.agents_config["data_analyst"],
             llm=AGENT_LLMS["data_analyst"],
-            tools=[code_interpreter],
+            tools=[
+                code_interpreter,
+                install_dependency
+            ],
             max_execution_time=180,
             memory=True,
             verbose=True,
@@ -213,6 +216,7 @@ class DataAnalysisCrew():
             llm=AGENT_LLMS["model_builder"],
             tools=[
                 code_interpreter,
+                install_dependency,
                 csv_search,
                 build_predictive_model,
             ],
@@ -233,6 +237,7 @@ class DataAnalysisCrew():
             llm=AGENT_LLMS["insight_reporter"],
             tools=[
                 code_interpreter,
+                install_dependency,
                 file_writer,
                 launch_dashboard
             ],
@@ -249,6 +254,7 @@ class DataAnalysisCrew():
         return Agent(
             config=self.agents_config["data_project_manager"],
             llm=AGENT_LLMS["data_project_manager"],
+            tools=[],
             allow_code_execution=False,
             code_execution_mode="safe",
             memory=True,
@@ -311,7 +317,8 @@ class DataAnalysisCrew():
     def launch_dashboard(self) -> Task:
         return Task(
             config=self.tasks_config["launch_dashboard"],
-            context=[self.summarize_findings()]
+            context=[self.summarize_findings()],
+            output_file=None
         )
     @crew
     def crew(self) -> Crew:

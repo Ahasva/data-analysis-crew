@@ -119,7 +119,7 @@ explore_data:
     You **must** save **≥ 3** PNGs into **{output_dir}/plots/**.
   expected_output: >
     Markdown report with:
-      • embeds / links for the saved plots  
+      • embeds / links for the saved plots: <img src="output/plots/correlation_heatmap.png" width="600" />
       • table of top correlations  
       • notes on anomalies / biases / outliers
   agent: data_analyst
@@ -156,46 +156,31 @@ select_features:
 # ---------------------------------------------------------------------------
 build_predictive_model:
   description: >
-    Train a predictive model using the cleaned dataset. 
-    Save all required artefacts for downstream analysis and dashboard display.
+    Train multiple predictive models using the cleaned dataset, 
+    compare them, and select the best based on validation performance.
 
-    **Tool to call**:  
-    `build_predictive_model(df, out_dir="{output_dir}", problem_type=problem_type)`
+    🛠️ Tool to call:
+    `build_predictive_model(data=cleaned_path, out_dir="{output_dir}", problem_type=problem_type, tuning=True)`
 
-    ✅ You must choose an appropriate model:
-      Available options:
-        - "random_forest"
-        - "logistic_reg"
-        - "svm"
-        - "knn"
-        - "gbt"
-        - "linear_reg"
-
-      Example logic:
-        - Logistic Regression → binary, low-dimensional problems  
-        - Random Forest / GBT → non-linear, interpretable  
-        - SVM → high feature count vs. samples  
-        - KNN → small datasets  
-
-    👉 Use `model_name="..."` explicitly in your call.
-
-    📊 The tool will:
-      - Train the model  
+    ✅ The tool will automatically:
+      - Try all appropriate models:
+          • classification: random_forest, logistic_reg, svm, knn, gbt  
+          • regression:     random_forest, linear_reg, svm, gbt
+      - Run GridSearchCV if `tuning=True` (default off)
+      - Pick the best-performing model (F1 or R²)
       - Save:
-        • `output/model-report.json` (with type, target, metrics, plots, summary)  
-        • `output/technical-metrics.md`  
-        • Plots into `output/plots/`
+          • `output/model-report.json` (type, target, metrics, plots, summary)  
+          • `output/technical-metrics.md`  
+          • Visualizations to `output/plots/`
+      - Include `all_model_scores` for dashboard bar chart use
 
-    🛑 Do **not** hand-code model training unless the helper fails.
+    🛑 Do **not** hard-code or guess the model name. The tool handles selection.
 
-    Required output files (all relative):
-      - `output/model-report.json`  
-      - `output/plots/feature_importances.png`  
-      - `output/plots/confusion_matrix.png` (only for classification)  
-      - `output/technical-metrics.md`
+    For all embedded plots in markdown, use:
+    <img src="plots/feature_importances.png" width="600" />
   expected_output: >
-    - `output/model-report.json` (with metrics, paths, summary).  
-    - `output/plots/feature_importances.png` (+ `confusion_matrix.png` if cls).
+    - `output/model-report.json` with selected model, metrics, summary, paths
+    - `output/plots/feature_importances.png` (+ confusion_matrix.png if classification)  
     - `output/technical-metrics.md`
   agent: model_builder
   context: [clean_data, select_features]
@@ -218,7 +203,7 @@ summarize_findings:
       - 3-5 bullet key insights  
       - a one-sentence recommendation  
       - embedded feature-importance image:
-          ![Feature Importances](plots/feature_importances.png)
+          <img src="plots/feature_importances.png" width="600" />
   expected_output: >
     Markdown file `output/final-insight-summary.md` with all of the above.
   agent: insight_reporter

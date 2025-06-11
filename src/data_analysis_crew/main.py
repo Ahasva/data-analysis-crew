@@ -5,10 +5,8 @@ Run with  `crewai run`  or  `python -m data_analysis_crew.main`
 """
 import sys
 import warnings
-import subprocess
-import webbrowser
-import time
 from pathlib import Path
+from data_analysis_crew.utils.instructions import INSTALL_LIB_TEMPLATE, AVAILABLE_LIBRARIES
 from data_analysis_crew.crew import DataAnalysisCrew
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
@@ -41,6 +39,8 @@ def run() -> None:
         "dataset_path": str(REL_PATH_DATA),
         "request"     : REQUEST,
         "output_dir"  : str(OUTPUT_DIR),
+        "install_hint": INSTALL_LIB_TEMPLATE,
+        "available_libraries": AVAILABLE_LIBRARIES
     }
 
     try:
@@ -115,11 +115,6 @@ def test():
 # ─────────────────────────────── script launch ───────────────────────────────
 if __name__ == "__main__":
     run()
-
-    # 🔥 auto-launch Streamlit dashboard
-    subprocess.Popen(["streamlit", "run", str(DASHBOARD_PY)])
-    time.sleep(3)
-    webbrowser.open_new("http://localhost:8501")
     print("Dashboard launched 🚀  "
           "(Ctrl-C here won't stop it; close the browser tab or "
           "press Ctrl-C in the Streamlit terminal)")
