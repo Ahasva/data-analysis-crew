@@ -22,7 +22,8 @@ from typing import Any, Dict, Union
 import shap
 import pandas as pd
 from crewai.tools import tool
-from data_analysis_crew.crew import ModelOutput
+from data_analysis_crew.schemas import ModelOutput
+from data_analysis_crew.utils.utils import to_posix_relative_path
 
 # --- ML and plotting libraries ---
 from sklearn.ensemble import (
@@ -210,7 +211,7 @@ def build_predictive_model(
             fig.tight_layout()
             fig.savefig(feat_png)
             plt.close(fig)
-            feat_path_str = str(feat_png.relative_to(PROJECT_ROOT))
+            feat_path_str = to_posix_relative_path(feat_png, PROJECT_ROOT)
         except (ValueError, RuntimeError) as e:
             print(f"❌ Feature plot failed: {e}")
 
@@ -219,7 +220,7 @@ def build_predictive_model(
         if problem_type == "classification":
             cm_png = plots_dir / "confusion_matrix.png"
             ConfusionMatrixDisplay.from_estimator(best_model, X_test, y_test).figure_.savefig(cm_png)
-            secondary_paths.append(str(cm_png.relative_to(PROJECT_ROOT)))
+            secondary_paths.append(to_posix_relative_path(cm_png, PROJECT_ROOT))
 
             if hasattr(best_model, "predict_proba"):
                 y_proba = best_model.predict_proba(X_test)[:, 1]
@@ -228,8 +229,8 @@ def build_predictive_model(
                 RocCurveDisplay.from_predictions(y_test, y_proba).figure_.savefig(roc_png)
                 PrecisionRecallDisplay.from_predictions(y_test, y_proba).figure_.savefig(pr_png)
                 secondary_paths.extend([
-                    str(roc_png.relative_to(PROJECT_ROOT)),
-                    str(pr_png.relative_to(PROJECT_ROOT)),
+                    to_posix_relative_path(roc_png, PROJECT_ROOT),
+                    to_posix_relative_path(pr_png, PROJECT_ROOT),
                 ])
         else:
             resid_png = plots_dir / "residuals.png"
@@ -242,7 +243,7 @@ def build_predictive_model(
             fig.tight_layout()
             fig.savefig(resid_png)
             plt.close(fig)
-            secondary_paths.append(str(resid_png.relative_to(out_dir)))
+            secondary_paths.append(to_posix_relative_path(resid_png, PROJECT_ROOT))
     except (ValueError, RuntimeError) as e:
         print(f"❌ Diagnostic plots failed: {e}")
 
@@ -265,7 +266,7 @@ def build_predictive_model(
                 plt.gcf().savefig(shap_path, bbox_inches="tight")
                 plt.close()
 
-                shap_path_str = str(shap_path.relative_to(PROJECT_ROOT))
+                shap_path_str = to_posix_relative_path(shap_path, PROJECT_ROOT)
                 secondary_paths.append(shap_path_str)
             else:
                 print("⚠️ SHAP values object was invalid or empty. Skipping SHAP plot.")
@@ -287,7 +288,7 @@ def build_predictive_model(
         fig.tight_layout()
         fig.savefig(bar_path)
         plt.close(fig)
-        secondary_paths.append(str(bar_path.relative_to(PROJECT_ROOT)))
+        secondary_paths.append(to_posix_relative_path(bar_path, PROJECT_ROOT))
     except (ValueError, RuntimeError, TypeError) as e:
         print(f"❌ Bar chart plot failed: {e}")
 
@@ -333,7 +334,7 @@ def build_predictive_model(
         "metrics": metrics,
         "plain_summary": plain,
         "all_model_scores": score_vals,
-        "technical_summary_path": str(report_md.relative_to(out_dir)),
+        "technical_summary_path": to_posix_relative_path(report_md, PROJECT_ROOT),
     }
 
     # ─── Consolidate optional outputs ───────────────
@@ -354,7 +355,7 @@ def build_predictive_model(
         output_files["shap_summary_path"] = shap_path_str
 
     if residuals_path:
-        output_files["residuals_path"] = str(residuals_path.relative_to(PROJECT_ROOT))
+        output_files["residuals_path"] = to_posix_relative_path(residuals_path, PROJECT_ROOT)
 
     report["outputs"] = output_files
 
@@ -386,7 +387,7 @@ def build_predictive_model(
     conf_path = output_files.get("confusion_matrix_path")
     roc_path  = next((p for p in secondary_paths if "roc_curve" in p), None)
     pr_path   = next((p for p in secondary_paths if "precision_recall" in p), None)
-    shap_path = output_files.get("shap_summary_path")
+    shap_path_url = output_files.get("shap_summary_path")
 
     if conf_path:
         md_lines.append(f"- Confusion Matrix:\n  <img src=\"{conf_path}\" width=\"600\" />")
@@ -394,8 +395,8 @@ def build_predictive_model(
         md_lines.append(f"- ROC Curve:\n  <img src=\"{roc_path}\" width=\"600\" />")
     if pr_path:
         md_lines.append(f"- Precision-Recall:\n  <img src=\"{pr_path}\" width=\"600\" />")
-    if shap_path:
-        md_lines.append(f"- SHAP Summary:\n  <img src=\"{shap_path}\" width=\"600\" />")
+    if shap_path_url:
+        md_lines.append(f"- SHAP Summary:\n  <img src=\"{shap_path_url}\" width=\"600\" />")
 
     # Best hyperparameters (if tuning was used)
     if isinstance(best_model, GridSearchCV):
