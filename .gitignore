@@ -22,6 +22,7 @@ datacrew/
 .DS_Store
 
 # --- Generated outputs (safe to delete/recreate) ------------
+build/
 output/
 db/
 knowledge/

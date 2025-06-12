@@ -70,60 +70,31 @@ explore_data:
       • Numeric cols → `numeric_features`  
       • Categorical → `categorical_features`
 
-    When you call the Code Interpreter, include
-    {
-      "code": "
-    import pandas as pd
-    import matplotlib.pyplot as plt
-    import seaborn as sns
+    The analysis must include:
+      1. Descriptive statistics (use `df.describe(include="all")`)  
+      2. Visualise distributions using histograms for each numeric feature  
+      3. Correlation heatmap between numerical features  
+      4. Save ≥ 3 visualizations into `{plot_path}/`  
+      5. Print meaningful summary insights
+
+    💡 You have access to:
+      - pandas, seaborn, matplotlib, pathlib
+      - `CodeInterpreterTool` will handle execution
+
+    Ensure the directory `{plot_path}/` exists before saving any plots:
+    ```python
     from pathlib import Path
+    Path("{plot_path}").mkdir(parents=True, exist_ok=True)
+    ```
 
-    df = pd.read_csv('knowledge/diabetes_cleaned.csv')
-
-    # 1) Descriptive statistics
-    stats = df.describe().to_string()
-    print(stats)
-
-    # 2) Example plot directory
-    plots_dir = Path('output/plots'); plots_dir.mkdir(parents=True, exist_ok=True)
-
-    # Histogram for each numeric column
-    for col in df.select_dtypes('number').columns:
-        df[col].hist()
-        plt.title(col)
-        filename = "{}_hist.png".format(col)
-        plt.savefig(plots_dir / filename)
-        plt.clf()
-
-    # 3) Correlation heat-map
-    plt.figure(figsize=(8,6))
-    sns.heatmap(df.corr(), annot=True, cmap='coolwarm')
-    plt.tight_layout()
-    heat_path = plots_dir / 'correlation_heatmap.png'
-    plt.savefig(heat_path)
-    print("Heat-map saved → {}".format(heat_path))
-
-    # ALWAYS finish with a print so the tool
-    # has something to capture as “final result”
-    print('EDA script finished')
-    ",
-      "libraries_used": ["pandas", "matplotlib", "seaborn"]
-    }.
-
-    Tasks:
-      1. Descriptive statistics (`df.describe()`; include categoricals)  
-      2. Visualise distributions / relationships  
-      3. Compute correlation matrix, list the top correlations with the target,
-         flag outliers & anomalies.
-
-    You **must** save **≥ 3** PNGs into **{output_dir}/plots/**.
+    Finish with a print message that summarizes your key insights.
   expected_output: >
     Markdown report with:
-      • embeds / links for the saved plots: <img src="output/plots/correlation_heatmap.png" width="600" />
+      • image embeds of saved plots (e.g. <img src="output/plots/correlation_heatmap.png" width="600" />)
       • table of top correlations  
-      • notes on anomalies / biases / outliers
+      • narrative on anomalies or trends
   agent: data_analyst
-  context: [] # alternative: clean_data
+  context: [clean_data]
 
 # ---------------------------------------------------------------------------
 #  4  FEATURE SELECTION ──────────────────────────────────────────────────────
@@ -171,7 +142,7 @@ build_predictive_model:
       - Save:
           • `output/model-report.json` (type, target, metrics, plots, summary)  
           • `output/technical-metrics.md`  
-          • Visualizations to `output/plots/`
+          • Visualizations to `{plot_path}/`
       - Include `all_model_scores` for dashboard bar chart use
 
     🛑 Do **not** hard-code or guess the model name. The tool handles selection.
@@ -210,25 +181,21 @@ summarize_findings:
   context: [build_predictive_model]
   output_file: output/final-insight-summary.md
 
-
 # ---------------------------------------------------------------------------
 #  7  LAUNCH DASHBOARD 🚀 ───────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
 launch_dashboard:
   description: >
-    Launch the Streamlit dashboard.
+    Launch the Streamlit dashboard by calling the prebuilt tool:
+    `launch_dashboard(path="dashboard.py", port=8501)`
 
-    Call this inside the Code Interpreter:
-    ```python
-    import subprocess, time, webbrowser
-
-    subprocess.Popen(["streamlit", "run", "dashboard.py"])
-    time.sleep(3)
-    webbrowser.open("http://localhost:8501")
-    print("Dashboard launched on http://localhost:8501")
-    ```
+    The tool will:
+      • Start the dashboard server via Streamlit
+      • Open the browser to the correct local URL
+      • Print confirmation that the dashboard is live
   expected_output: >
     A message confirming the dashboard URL, e.g.:
     "Dashboard launched on http://localhost:8501"
   agent: insight_reporter
   context: [summarize_findings]
+  

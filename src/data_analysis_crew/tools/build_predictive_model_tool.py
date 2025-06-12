@@ -22,6 +22,7 @@ from typing import Any, Dict, Union
 import shap
 import pandas as pd
 from crewai.tools import tool
+from data_analysis_crew.crew import ModelOutput
 
 # --- ML and plotting libraries ---
 from sklearn.ensemble import (
@@ -69,6 +70,9 @@ _MODEL_PARAM_GRID = {
     "gbt": {"n_estimators": [50, 100], "learning_rate": [0.05, 0.1], "max_depth": [3, 5]},
     "linear_reg": {},  # No tuning needed
 }
+
+# Root path for resolving relative paths consistently with Streamlit dashboard
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
 # --------------------------------------------------------------------------- #
 #  Helper: path validation                                                   #
@@ -134,7 +138,7 @@ def build_predictive_model(
         raise ValueError("Invalid `data` path string provided")
 
     df = pd.read_csv(data)
-    out_dir = Path(out_dir)
+    out_dir = Path(out_dir).resolve()
     plots_dir = out_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 
@@ -206,7 +210,7 @@ def build_predictive_model(
             fig.tight_layout()
             fig.savefig(feat_png)
             plt.close(fig)
-            feat_path_str = str(feat_png.relative_to(out_dir))
+            feat_path_str = str(feat_png.relative_to(PROJECT_ROOT))
         except (ValueError, RuntimeError) as e:
             print(f"❌ Feature plot failed: {e}")
 
@@ -215,7 +219,7 @@ def build_predictive_model(
         if problem_type == "classification":
             cm_png = plots_dir / "confusion_matrix.png"
             ConfusionMatrixDisplay.from_estimator(best_model, X_test, y_test).figure_.savefig(cm_png)
-            secondary_paths.append(str(cm_png.relative_to(out_dir)))
+            secondary_paths.append(str(cm_png.relative_to(PROJECT_ROOT)))
 
             if hasattr(best_model, "predict_proba"):
                 y_proba = best_model.predict_proba(X_test)[:, 1]
@@ -224,8 +228,8 @@ def build_predictive_model(
                 RocCurveDisplay.from_predictions(y_test, y_proba).figure_.savefig(roc_png)
                 PrecisionRecallDisplay.from_predictions(y_test, y_proba).figure_.savefig(pr_png)
                 secondary_paths.extend([
-                    str(roc_png.relative_to(out_dir)),
-                    str(pr_png.relative_to(out_dir)),
+                    str(roc_png.relative_to(PROJECT_ROOT)),
+                    str(pr_png.relative_to(PROJECT_ROOT)),
                 ])
         else:
             resid_png = plots_dir / "residuals.png"
@@ -261,7 +265,7 @@ def build_predictive_model(
                 plt.gcf().savefig(shap_path, bbox_inches="tight")
                 plt.close()
 
-                shap_path_str = str(shap_path.relative_to(out_dir))
+                shap_path_str = str(shap_path.relative_to(PROJECT_ROOT))
                 secondary_paths.append(shap_path_str)
             else:
                 print("⚠️ SHAP values object was invalid or empty. Skipping SHAP plot.")
@@ -283,14 +287,14 @@ def build_predictive_model(
         fig.tight_layout()
         fig.savefig(bar_path)
         plt.close(fig)
-        secondary_paths.append(str(bar_path.relative_to(out_dir)))
+        secondary_paths.append(str(bar_path.relative_to(PROJECT_ROOT)))
     except (ValueError, RuntimeError, TypeError) as e:
         print(f"❌ Bar chart plot failed: {e}")
 
     # Residuals CSV export (for regression)
     if problem_type == "regression":
         try:
-            residuals_path = out_dir / "model-residuals.csv"
+            residuals_path = (out_dir / "model-residuals.csv")
             pd.DataFrame({
                 "y_true": y_test,
                 "y_pred": y_pred,
@@ -350,7 +354,7 @@ def build_predictive_model(
         output_files["shap_summary_path"] = shap_path_str
 
     if residuals_path:
-        output_files["residuals_path"] = str(residuals_path.relative_to(out_dir))
+        output_files["residuals_path"] = str(residuals_path.relative_to(PROJECT_ROOT))
 
     report["outputs"] = output_files
 
@@ -406,7 +410,17 @@ def build_predictive_model(
     for name, score in score_vals.items():
         md_lines.append(f"| {name} | {score:.4f} |")
 
-    report_md.write_text("\n\n".join(md_lines))
+    report_md.write_text("\n".join(md_lines))
 
     print(f"✅ Best model selected: {best_model_name}")
-    return report
+
+    return ModelOutput(
+        model_type=model_type,
+        problem_type=problem_type,
+        target=target,
+        metrics=metrics,
+        plain_summary=plain,
+        feature_importance_path=feat_path_str,
+        secondary_plot_paths=secondary_paths if secondary_paths else [],
+        confusion_matrix_path=output_files.get("confusion_matrix_path")
+    )

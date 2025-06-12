@@ -32,29 +32,36 @@ st.header("🤖 Model Report")
 
 model_data = {}
 if REPORT_JSON.exists():
-    model_data = json.loads(REPORT_JSON.read_text())
+    if REPORT_JSON.stat().st_size > 0:
+        try:
+            model_data = json.loads(REPORT_JSON.read_text())
 
-    col1, col2 = st.columns(2)
-    with col1:
-        st.subheader("Model Info")
-        st.markdown(f"**Model Type:** {model_data.get('model_type', 'N/A')}")
-        st.markdown(f"**Target Variable:** `{model_data.get('target', 'N/A')}`")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.subheader("Model Info")
+                st.markdown(f"**Model Type:** {model_data.get('model_type', 'N/A')}")
+                st.markdown(f"**Target Variable:** `{model_data.get('target', 'N/A')}`")
 
-    with col2:
-        st.subheader("Plain Summary")
-        st.markdown(model_data.get("plain_summary", "No summary found."))
+            with col2:
+                st.subheader("Plain Summary")
+                st.markdown(model_data.get("plain_summary", "No summary found."))
 
-    st.subheader("📈 Metrics")
-    for metric, value in (model_data.get("metrics") or {}).items():
-        st.markdown(f"- **{metric}**: `{value:.4f}`")
+            st.subheader("📈 Metrics")
+            for metric, value in (model_data.get("metrics") or {}).items():
+                st.markdown(f"- **{metric}**: `{value:.4f}`")
 
-    # ======= 🔍 Model comparison chart (NEW) ================================
-    all_scores = model_data.get("all_model_scores")
-    if isinstance(all_scores, dict) and all_scores:
-        st.subheader("📊 Model Comparison")
-        st.bar_chart(all_scores)
+            # ======= 🔍 Model comparison chart ================================
+            all_scores = model_data.get("all_model_scores")
+            if isinstance(all_scores, dict) and all_scores:
+                st.subheader("📊 Model Comparison")
+                st.bar_chart(all_scores)
+
+        except json.JSONDecodeError as e:
+            st.error(f"❌ model-report.json is malformed:\n\n{e}")
+    else:
+        st.warning("⚠️ model-report.json is empty.")
 else:
-    st.warning("`model-report.json` not found in `output/`.")
+    st.warning("❌ model-report.json not found in `output/`.")
 
 # ======= Visualisations ======================================================
 st.header("🖼️ Visualisations")
@@ -66,7 +73,7 @@ secondary_plots = model_data.get("secondary_plot_paths", [])
 
 # Feature importances
 if feature_plot:
-    plot_path = OUTPUT_DIR / feature_plot
+    plot_path = Path(feature_plot)
     if plot_path.exists():
         st.subheader("🔍 Feature Importances")
         st.image(str(plot_path), caption="Feature Importances", use_container_width=True)
@@ -75,7 +82,7 @@ if feature_plot:
 
 # Confusion matrix
 if conf_matrix:
-    conf_matrix_path = OUTPUT_DIR / conf_matrix
+    conf_matrix_path = Path(conf_matrix)
     if conf_matrix_path.exists():
         st.subheader("📉 Confusion Matrix")
         st.image(str(conf_matrix_path), caption="Confusion Matrix", use_container_width=True)
@@ -85,7 +92,7 @@ if conf_matrix:
 # Secondary plots (ROC, PR, Residuals, etc.)
 if secondary_plots:
     for path_str in secondary_plots:
-        spath = OUTPUT_DIR / path_str
+        spath = Path(path_str)
         if spath.exists():
             lower_name = spath.name.lower()
             title = "📊 Secondary Plot"
