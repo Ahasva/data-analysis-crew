@@ -88,7 +88,7 @@ RELATIVE_PATH = DATA_PATH.relative_to(PROJECT_ROOT)
 #PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 #DATA_PATH = os.path.join(PROJECT_ROOT, DATA_FOLDER, FILE_NAME)
 
-csv_source = CSVKnowledgeSource(file_paths=["diabetes.csv"])
+csv_source = CSVKnowledgeSource(file_paths=[str(RELATIVE_PATH)])
 csv_search = CSVSearchTool(file_path=RELATIVE_PATH)
 directory_reader = DirectoryReadTool()
 file_reader = FileReadTool()
