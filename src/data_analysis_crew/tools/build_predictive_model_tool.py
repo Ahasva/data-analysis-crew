@@ -24,6 +24,7 @@ import pandas as pd
 from crewai.tools import tool
 from data_analysis_crew.schemas import ModelOutput
 from data_analysis_crew.utils.utils import to_posix_relative_path
+from data_analysis_crew.utils.project_root import get_project_root
 
 # --- ML and plotting libraries ---
 from sklearn.ensemble import (
@@ -73,7 +74,7 @@ _MODEL_PARAM_GRID = {
 }
 
 # Root path for resolving relative paths consistently with Streamlit dashboard
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+PROJECT_ROOT = get_project_root()
 
 # --------------------------------------------------------------------------- #
 #  Helper: path validation                                                   #
@@ -140,14 +141,15 @@ def build_predictive_model(
 
     df = pd.read_csv(data)
     # Ensure out_dir is always inside the project root (unless absolute)
-    out_dir = Path(out_dir)
+    out_dir = Path(out_dir).expanduser()
     if not out_dir.is_absolute():
-        out_dir = PROJECT_ROOT / out_dir
+        out_dir = (PROJECT_ROOT / out_dir).resolve()
 
     out_dir.mkdir(parents=True, exist_ok=True)
 
     plots_dir = out_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
+    print(f"📂 Writing plots to {plots_dir}")
 
     if problem_type is None:
         problem_type = "classification" if (df[target].dtype == "O" or df[target].nunique() <= 10) else "regression"

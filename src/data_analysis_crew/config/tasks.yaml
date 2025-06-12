@@ -1,8 +1,18 @@
+# =============================================================================
+#  DATA ANALYSIS CREW - TASK DEFINITIONS
+# =============================================================================
+# Global path conventions
+# - `plot_path`   = output/plots   ← all .png visualizations saved here
+# - `output_dir`  = output/        ← all .md reports, .json model results, logs
+
 # ---------------------------------------------------------------------------
 #  1  LOAD ──────────────────────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
 load_data:
   description: >
+    template_variables:
+    - dataset_path
+
     Load the CSV dataset using the exact *literal* path in `{dataset_path}`.
     ⚠️ Do **not** search or list directories.
 
@@ -24,14 +34,18 @@ load_data:
 # ---------------------------------------------------------------------------
 clean_data:
   description: >
+    template_variables:
+    - dataset_path
+
     Tidy up the raw dataset.
 
-    • Call the tool:
-      `load_or_clean(raw_path="{dataset_path}", cleaned_path="knowledge/diabetes_cleaned.csv")`
-    • If the cleaned file exists, it’ll be re-used.
-    • If **knowledge/diabetes_cleaned.csv** exists → just load it, gather
+    Use the `load_or_clean` tool with:
+      - raw_path = {dataset_path}
+      - cleaned_path = knowledge/diabetes_cleaned.csv
+    - If the cleaned file exists, it’ll be re-used.
+    - If **knowledge/diabetes_cleaned.csv** exists → just load it, gather
       metadata, and return – **do not** re-clean.  
-    • Else → read **knowledge/diabetes.csv**, normalise column names
+    - Else → read **knowledge/diabetes.csv**, normalise column names
       (lower-snake-case), fix missing values / constants, then save to the
       same cleaned path.
 
@@ -63,6 +77,10 @@ clean_data:
 # ---------------------------------------------------------------------------
 explore_data:
   description: >
+    template_variables:
+    - plot_path
+    - expected_plots
+
     Perform an exploratory analysis of the cleaned dataset.
 
     Inputs (already in context):
@@ -74,7 +92,9 @@ explore_data:
       - Describe the dataset statistically (e.g. `df.describe(include="all")`)
       - Visualize distributions of all numeric columns
       - Show relationships using a correlation heatmap
-      - Save ≥3 high-quality plots to `{plot_path}/`
+      - Save ≥3 high-quality plots to `{plot_path}/` (e.g. output/plots/*.png)
+          # NOTE: `plot_path` is passed as `output/plots` from main.py.
+          # This keeps all plots in one consistent directory.
       - Print meaningful summary insights
 
     💡 You may also:
@@ -108,6 +128,13 @@ explore_data:
 # ---------------------------------------------------------------------------
 select_features:
   description: >
+    template_variables:
+    - request
+    - classification_metrics
+    - regression_metrics
+    - classification_models
+    - regression_models
+
     Based on the goal:
 
         {request}
@@ -153,6 +180,17 @@ select_features:
 # ---------------------------------------------------------------------------
 build_predictive_model:
   description: >
+    template_variables:
+    - cleaned_path
+    - problem_type
+    - output_dir
+    - plot_path
+    - classification_models
+    - regression_models
+    - classification_metrics
+    - regression_metrics
+    - expected_plots
+
     Train multiple predictive models using the cleaned dataset, 
     compare them, and select the best based on validation performance.
 
@@ -163,6 +201,8 @@ build_predictive_model:
       - Automatically tries multiple model types depending on the problem (classification or regression)
       - Applies hyperparameter tuning with GridSearchCV (`tuning=True`)
       - Selects the best model using F1 or R²
+      # ⚠️ Plots are saved using `{plot_path}`, which is `output/plots`
+      # Do not change unless you update all markdown references.
       - Saves:
           • `output/model-report.json` with type, metrics, and summary  
           • `output/technical-metrics.md`  
@@ -198,6 +238,14 @@ build_predictive_model:
 # ---------------------------------------------------------------------------
 summarize_findings:
   description: >
+    template_variables:
+    - model_type
+    - metrics
+    - feature_importance_path
+    - classification_metrics
+    - regression_metrics
+    - expected_plots
+
     Craft an executive-level summary for non-technical stakeholders.
 
     Use:
@@ -256,6 +304,10 @@ summarize_findings:
 # ---------------------------------------------------------------------------
 validate_summary:
   description: >
+    template_variables:
+    - filename
+    - directory
+
     Run a final checklist audit on the summary report `output/final-insight-summary.md`.
 
     Use FileReadTool to open and audit: `output/final-insight-summary.md`.
