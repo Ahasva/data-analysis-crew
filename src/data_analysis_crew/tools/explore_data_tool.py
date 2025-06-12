@@ -6,6 +6,18 @@ from crewai.tools import tool
 
 @tool("Explore cleaned dataset with EDA plots and stats")
 def explore_data():
+    """
+    Perform exploratory data analysis (EDA) on a cleaned dataset.
+
+    This tool reads the diabetes dataset from disk, generates univariate
+    distribution plots for numeric columns, a correlation heatmap,
+    identifies top correlated features with the outcome variable,
+    and detects potential outliers using the IQR method.
+
+    It saves visualizations to the 'output/plots' directory and
+    returns structured information including plot paths, top
+    correlations, statistical notes, and anomaly rows.
+    """
     df = pd.read_csv("knowledge/diabetes_cleaned.csv")
     plots_dir = Path("output/plots")
     plots_dir.mkdir(parents=True, exist_ok=True)
