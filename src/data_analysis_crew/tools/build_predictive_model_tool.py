@@ -73,7 +73,7 @@ _MODEL_PARAM_GRID = {
 }
 
 # Root path for resolving relative paths consistently with Streamlit dashboard
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 # --------------------------------------------------------------------------- #
 #  Helper: path validation                                                   #
@@ -139,7 +139,13 @@ def build_predictive_model(
         raise ValueError("Invalid `data` path string provided")
 
     df = pd.read_csv(data)
-    out_dir = Path(out_dir).resolve()
+    # Ensure out_dir is always inside the project root (unless absolute)
+    out_dir = Path(out_dir)
+    if not out_dir.is_absolute():
+        out_dir = PROJECT_ROOT / out_dir
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+
     plots_dir = out_dir / "plots"
     plots_dir.mkdir(parents=True, exist_ok=True)
 

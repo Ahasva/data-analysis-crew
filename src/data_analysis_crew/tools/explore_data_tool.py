@@ -25,7 +25,7 @@ def explore_data(
       - Top correlated features
       - Anomalous records (outliers)
     """
-    PROJECT_ROOT = Path(__file__).resolve().parents[2]
+    PROJECT_ROOT = Path(__file__).resolve().parents[3]
     df = pd.read_csv(data_path)
 
     plots_dir = PROJECT_ROOT / output_dir
