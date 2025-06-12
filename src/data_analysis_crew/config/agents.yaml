@@ -74,19 +74,20 @@ data_project_manager:
     coordinate agents using tools, context fields, and dependencies to ensure quality and sequence integrity.
 
     instructions: |
-      ### 🛠 Delegation Rules
+    ### 🛠 Delegation Rules
 
-      1. Use exactly the tool “Delegate work to coworker” when assigning a task.
-      2. Action Input must be valid JSON using **plain strings only**, for example:
+    1. Use exactly the tool “Delegate work to coworker” when assigning a task.
+    2. Action Input must be valid JSON using **plain strings only**, for example:
+      {
+        "coworker": "Exploratory Data Analyst",
+        "task": "Perform an exploratory analysis of the cleaned dataset (knowledge/diabetes_cleaned.csv)…",
+        "context": "Use pandas… save ≥3 plots to output/plots …"
+      }
+    3. Include everything the coworker needs — never refer to previous messages.
 
-          {
-            "coworker": "Exploratory Data Analyst",
-            "task": "Perform an exploratory analysis of the cleaned dataset (knowledge/diabetes_cleaned.csv)…",
-            "context": "Use pandas… save ≥3 plots to output/plots …"
-          }
-
-      3. Include everything the coworker needs — never refer to previous messages.
-      4. If delegation fails, **reformat** before retrying.
+    4. If delegation fails:
+      - Slightly vary the `task` or `context` (e.g. add `"round 2"` or `"retry": true`)
+      - Or embed a timestamp like (attempted at `datetime`)
 
     **Important**:
     - If a required Python package is missing, follow this pattern: {install_hint}.

@@ -6,6 +6,7 @@ Run with  `crewai run`  or  `python -m data_analysis_crew.main`
 import sys
 import warnings
 from pathlib import Path
+from datetime import datetime, timezone
 from data_analysis_crew.utils.instructions import INSTALL_LIB_TEMPLATE, AVAILABLE_LIBRARIES
 from data_analysis_crew.crew import DataAnalysisCrew
 
@@ -43,12 +44,13 @@ resulting in diabetes?
 def run() -> None:
     """Run the full data-analysis crew pipeline."""
     inputs = {
-        "dataset_path": str(REL_PATH_DATA),                   # knowledge/diabetes.csv
-        "request"     : REQUEST,
-        "output_dir"  : str(OUTPUT_DIR_REL),                  # output
-        "plot_path"   : str(PLOT_PATH_REL),                   # output/plots
-        "install_hint": INSTALL_LIB_TEMPLATE,
-        "available_libraries": AVAILABLE_LIBRARIES
+        "dataset_path"       : str(REL_PATH_DATA),
+        "request"            : REQUEST,
+        "output_dir"         : str(OUTPUT_DIR_REL),                  # output
+        "plot_path"          : str(PLOT_PATH_REL),                   # output/plots
+        "install_hint"       : INSTALL_LIB_TEMPLATE,
+        "available_libraries": AVAILABLE_LIBRARIES,
+        "datetime"           : datetime.now(timezone.utc).isoformat()
     }
 
     try:

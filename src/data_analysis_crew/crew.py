@@ -40,11 +40,6 @@ OPENAI_MODEL_NAME = os.getenv("OPENAI_MODEL_NAME", "openai/gpt-4o-mini")
 ANTHROPIC_MODEL_NAME = os.getenv("ANTHROPIC_MODEL_NAME", "anthropic/claude-3-haiku-20240307")
 GOOGLE_MODEL_NAME = os.getenv("GOOGLE_MODEL_NAME", "gemini/gemini-2.0-flash")
 
-# Currently not used
-AGENT_MODEL = LLM(model=OPENAI_MODEL_NAME)
-PLANNING_MODEL = LLM(model=OPENAI_MODEL_NAME)
-MANAGER_MODEL = LLM(model="gpt-4o-mini", temperature=0.1)
-
 default_tag = os.getenv("CREWAI_DOCKER_IMAGE_TAG", "code-interpreter:latest")
 
 # ======= LLM CONFIGURATIONS =======
@@ -71,9 +66,15 @@ AGENT_LLMS = {
         ),
 }
 
+FUNCTION_CALLING_LLM = LLM(
+    model=OPENAI_MODEL_NAME,
+    temperature=0.0
+)
+
 print("\nUsing Models:")
 for role, llm in AGENT_LLMS.items():
     print(f"\t{role}:\n\t\t{llm.model}\t(temp={llm.temperature})")
+print(f"\t{FUNCTION_CALLING_LLM}:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNCTION_CALLING_LLM.temperature})")
 
 # ======= GLOBAL PATHS & TOOLS =======
 DATA_FOLDER = "knowledge"
@@ -134,7 +135,8 @@ RUN pip install --upgrade pip && \\
             print("📝 Created build/Dockerfile")
 
             # ✅ Tag with requirements hash
-            requirements_hash = hashlib.md5(requirements_txt.encode()).hexdigest()
+            hash_source = (BUILD_DIR / "requirements.txt").read_bytes()
+            requirements_hash = hashlib.md5(hash_source).hexdigest()
             self.image_tag = f"crewai-env:{requirements_hash}"
             self.code_interpreter = CodeInterpreterTool(default_image_tag=self.image_tag)
             print(f"🧩 Using Docker image tag: {self.image_tag}")
@@ -180,6 +182,7 @@ RUN pip install --upgrade pip && \\
                     load_or_clean
                 ] if tool is not None
             ],
+            function_calling_llm=FUNCTION_CALLING_LLM,
             max_execution_time=180,
             memory=True,
             verbose=True,
@@ -202,14 +205,16 @@ RUN pip install --upgrade pip && \\
                     explore_data
                 ] if tool is not None
             ],
+            function_calling_llm=FUNCTION_CALLING_LLM,
             max_execution_time=180,
             memory=True,
             verbose=True,
+            allow_delegation=False,
             allow_code_execution=True,
             code_execution_mode="safe",
+            inject_date=True,
             reasoning=True,
             max_reasoning_attempts=2,
-            allow_delegation=False,
             knowledge_sources=[csv_source]
         )
 
@@ -226,10 +231,12 @@ RUN pip install --upgrade pip && \\
                     build_predictive_model
                 ] if tool is not None
             ],
+            function_calling_llm=FUNCTION_CALLING_LLM,
             allow_code_execution=True,
             code_execution_mode="safe",
             memory=True,
             verbose=True,
+            inject_date=True,
             reasoning=True,
             max_execution_time=360,
             allow_delegation=False,
@@ -249,10 +256,13 @@ RUN pip install --upgrade pip && \\
                     launch_dashboard
                 ] if tool is not None
             ],
+            function_calling_llm=FUNCTION_CALLING_LLM,
             allow_code_execution=True,
             code_execution_mode="safe",
             memory=True,
             verbose=True,
+            inject_date=True,
+            reasoning=True,
             max_execution_time=180,
             max_reasoning_attempts=2
         )
@@ -267,6 +277,7 @@ RUN pip install --upgrade pip && \\
             code_execution_mode="safe",
             memory=True,
             verbose=True,
+            inject_date=True,
             reasoning=True,
             max_reasoning_attempts=1,
             allow_delegation=True
@@ -340,9 +351,10 @@ RUN pip install --upgrade pip && \\
             agents=non_manager_agents,
             tasks=self.tasks,
             process=Process.hierarchical,
-            planning=True,
-            manager_agent=self.data_project_manager(),
             verbose=True,
             memory=True,
+            function_calling_llm=FUNCTION_CALLING_LLM,
+            manager_agent=self.data_project_manager(),
+            planning=True,
             output_log_file="output/crew_log.json"
         )

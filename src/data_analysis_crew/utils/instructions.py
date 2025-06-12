@@ -46,5 +46,6 @@ AVAILABLE_LIBRARIES = [
     "tensorflow",
     "torch",
     "torchvision",
-    "shap"
+    "shap",
+    "streamlit"
 ]
