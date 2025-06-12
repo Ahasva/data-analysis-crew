@@ -80,16 +80,18 @@ DATA_FOLDER = "knowledge"
 FILE_NAME = "diabetes.csv"
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
-DATA_PATH = PROJECT_ROOT / DATA_FOLDER / FILE_NAME
+FOLDER_PATH = Path(DATA_FOLDER)
+RELATIVE_PATH = Path(DATA_FOLDER) / FILE_NAME
 
-# pass *relative* path to the crew / tools
-RELATIVE_PATH = DATA_PATH.relative_to(PROJECT_ROOT)
+csv_source = CSVKnowledgeSource(file_paths=[FILE_NAME])
+csv_search = CSVSearchTool(csv=str(RELATIVE_PATH))
 
-#PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
-#DATA_PATH = os.path.join(PROJECT_ROOT, DATA_FOLDER, FILE_NAME)
+print("✅ FOLDER_PATH (resolved):", (PROJECT_ROOT / FOLDER_PATH).resolve())
+print("✅ RELATIVE_PATH (resolved):", (RELATIVE_PATH).resolve())
+print("✅ FOLDER_PATH (resolved):", PROJECT_ROOT / FOLDER_PATH)
+print("✅ RELATIVE_PATH:", str(RELATIVE_PATH))
+print("✅ FILE_NAME:", str(FILE_NAME))
 
-csv_source = CSVKnowledgeSource(file_paths=[str(RELATIVE_PATH)])
-csv_search = CSVSearchTool(file_path=RELATIVE_PATH)
 directory_reader = DirectoryReadTool()
 file_reader = FileReadTool()
 file_writer = FileWriterTool()
@@ -105,7 +107,7 @@ class DataAnalysisCrew():
     # Dynamically assigned during `@before_kickoff` after Docker image resolution
     code_interpreter: Optional[CodeInterpreterTool] = None
     # Will be assigned in @before_kickoff from hash(requirements_txt)
-    image_tag: Optional[str] = None  
+    image_tag: Optional[str] = None
 
     # ── Docker environment ───────────────────────────────
     @before_kickoff
