@@ -47,23 +47,27 @@ AGENT_LLMS = {
     "data_engineer": LLM(
         model=OPENAI_MODEL_NAME,
         temperature=0.2
-        ),
+    ),
     "data_analyst": LLM(
         model=ANTHROPIC_MODEL_NAME,
         temperature=0.3
-        ),
+    ),
     "model_builder": LLM(
         model=OPENAI_MODEL_NAME,
         temperature=0.2
-        ),
+    ),
     "insight_reporter": LLM(
         model=ANTHROPIC_MODEL_NAME,
         temperature=0.3
-        ),
+    ),
+    "quality_checker": LLM(
+        model=OPENAI_MODEL_NAME,
+        temperature=0.1
+    ),
     "data_project_manager": LLM(
         model=OPENAI_MODEL_NAME,
         temperature=0.1
-        ),
+    ),
 }
 
 FUNCTION_CALLING_LLM = LLM(
@@ -75,6 +79,7 @@ print("\nUsing Models:")
 for role, llm in AGENT_LLMS.items():
     print(f"\t{role}:\n\t\t{llm.model}\t(temp={llm.temperature})")
 print(f"\t{FUNCTION_CALLING_LLM}:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNCTION_CALLING_LLM.temperature})")
+print(f"\tfunction_calling_llm:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNCTION_CALLING_LLM.temperature})")
 
 # ======= GLOBAL PATHS & TOOLS =======
 DATA_FOLDER = "knowledge"
@@ -137,6 +142,7 @@ RUN pip install --upgrade pip && \\
             # ✅ Tag with requirements hash
             hash_source = (BUILD_DIR / "requirements.txt").read_bytes()
             requirements_hash = hashlib.md5(hash_source).hexdigest()
+            print(f"🔐 Docker hash: {requirements_hash}")
             self.image_tag = f"crewai-env:{requirements_hash}"
             self.code_interpreter = CodeInterpreterTool(default_image_tag=self.image_tag)
             print(f"🧩 Using Docker image tag: {self.image_tag}")
@@ -266,6 +272,23 @@ RUN pip install --upgrade pip && \\
             max_execution_time=180,
             max_reasoning_attempts=2
         )
+    
+    @agent
+    def quality_checker(self) -> Agent:
+        return Agent(
+            config=self.agents_config["quality_checker"],
+            llm=AGENT_LLMS["quality_checker"],
+            tools=[
+                file_reader,
+                file_writer
+            ],
+            memory=True,
+            verbose=True,
+            inject_date=True,
+            reasoning=True,
+            max_reasoning_attempts=1,
+            allow_delegation=False
+        )
 
     @agent
     def data_project_manager(self) -> Agent:
@@ -331,6 +354,14 @@ RUN pip install --upgrade pip && \\
             config=self.tasks_config["summarize_findings"],
             context=[self.build_predictive_model()],
             output_file="output/final-insight-summary.md"
+        )
+    
+    @task
+    def validate_summary(self) -> Task:
+        return Task(
+            config=self.tasks_config["validate_summary"],
+            context=[self.summarize_findings()],
+            output_file="output/final-report-checklist.md"
         )
 
     @task

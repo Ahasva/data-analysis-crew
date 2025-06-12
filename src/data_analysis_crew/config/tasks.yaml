@@ -70,29 +70,36 @@ explore_data:
       • Numeric cols → `numeric_features`  
       • Categorical → `categorical_features`
 
-    The analysis must include:
-      1. Descriptive statistics (use `df.describe(include="all")`)  
-      2. Visualise distributions using histograms for each numeric feature  
-      3. Correlation heatmap between numerical features  
-      4. Save ≥ 3 visualizations into `{plot_path}/`  
-      5. Print meaningful summary insights
+    Your job:
+      - Describe the dataset statistically (e.g. `df.describe(include="all")`)
+      - Visualize distributions of all numeric columns
+      - Show relationships using a correlation heatmap
+      - Save ≥3 high-quality plots to `{plot_path}/`
+      - Print meaningful summary insights
 
-    💡 You have access to:
+    💡 You may also:
+      - Investigate missing values, outliers, and collinearity
+      - Add boxplots or pairplots if useful
+
+    📊 Target plot expectations:
+      {expected_plots}
+
+    Tools and packages available:
       - pandas, seaborn, matplotlib, pathlib
       - `CodeInterpreterTool` will handle execution
 
-    Ensure the directory `{plot_path}/` exists before saving any plots:
+    📁 Make sure this folder exists before saving plots:
     ```python
     from pathlib import Path
     Path("{plot_path}").mkdir(parents=True, exist_ok=True)
     ```
 
-    Finish with a print message that summarizes your key insights.
+    Finish with a markdown summary of your findings, including embedded images and key correlations.
   expected_output: >
     Markdown report with:
-      • image embeds of saved plots (e.g. <img src="output/plots/correlation_heatmap.png" width="600" />)
-      • table of top correlations  
-      • narrative on anomalies or trends
+      - 2–5 image embeds (use <img src="…" width="600" />)
+      - table of strongest correlations
+      - 3–5 bullet summary insights
   agent: data_analyst
   context: [clean_data]
 
@@ -101,24 +108,43 @@ explore_data:
 # ---------------------------------------------------------------------------
 select_features:
   description: >
-    Select the strongest predictors for:
+    Based on the goal:
 
         {request}
 
-    Use:
-      • `top_correlations` (from EDA)  
-      • `statistical_notes`
+    and the prior EDA results, identify the strongest predictive features and
+    determine whether this is a **classification** or **regression** problem.
 
-    Decide whether the prediction target is categorical or numeric:
-      → return `"classification"` or `"regression"`.
+    You have access to:
+      - `top_correlations` (from the correlation matrix)
+      - Descriptive statistics and variable types
+      - Anomalies, distributions, missing values
+      - consider which metrics would be useful:
+        - classification problem: {classification_metrics}
+        - regression problem: {regression_metrics} 
 
-    Deliver:
-      • `top_features` – list & rationale  
-      • `problem_type` – classification / regression (+ why)
+    Your tasks:
+      1. Identify the most relevant features for modeling — explain your reasoning
+      2. Determine the appropriate problem type:
+         - classification → predict categories (e.g. disease = yes/no)
+         - regression → predict numeric values (e.g. blood sugar level)
+      3. Justify your decision using data context + field descriptions
+
+    ❗ Do **not** hard-code model names yet — selection happens later.
+
+    You may optionally suggest models from this list: 
+      - classification_models: {classification_models}, 
+      - regression models: {regression_models}, 
+
+    Return:
+      - `top_features` – list of chosen columns, 
+      - `problem_type` – `"classification"` or `"regression"`, 
+      - explanation why, 
   expected_output: >
-    Markdown brief:
-      – chosen features + justification  
-      – inferred problem type + explanation
+    Markdown brief with:
+      - Chosen features + justification (refer to correlation, distributions, domain knowledge)
+      - Inferred problem type + explanation
+      - Optional: brief note on suitable model families
   agent: data_analyst
   context: [explore_data]
 
@@ -133,17 +159,28 @@ build_predictive_model:
     🛠️ Tool to call:
     `build_predictive_model(data=cleaned_path, out_dir="{output_dir}", problem_type=problem_type, tuning=True)`
 
-    ✅ The tool will automatically:
-      - Try all appropriate models:
-          • classification: random_forest, logistic_reg, svm, knn, gbt  
-          • regression:     random_forest, linear_reg, svm, gbt
-      - Run GridSearchCV if `tuning=True` (default off)
-      - Pick the best-performing model (F1 or R²)
-      - Save:
-          • `output/model-report.json` (type, target, metrics, plots, summary)  
+    ✅ This tool:
+      - Automatically tries multiple model types depending on the problem (classification or regression)
+      - Applies hyperparameter tuning with GridSearchCV (`tuning=True`)
+      - Selects the best model using F1 or R²
+      - Saves:
+          • `output/model-report.json` with type, metrics, and summary  
           • `output/technical-metrics.md`  
-          • Visualizations to `{plot_path}/`
-      - Include `all_model_scores` for dashboard bar chart use
+          • visualizations into `{plot_path}/`  
+      - Exposes `all_model_scores` for dashboard comparisons
+
+    📌 Scope of models to consider:
+      - classificationmodels: {classification_models}, 
+      - regression models: {regression_models}, 
+
+    📊 Evaluation metrics (choose per problem type):
+      - classification problem: {classification_metrics}, 
+      - regression problem: {regression_metrics},
+    📝 Use the most relevant metrics. The lists below are suggestions:
+
+    🖼️ Ensure the following plots are saved (if relevant):
+      {expected_plots}
+    💡 If a plot is not applicable (e.g., ROC for regression), skip gracefully.
 
     🛑 Do **not** hard-code or guess the model name. The tool handles selection.
 
@@ -156,7 +193,6 @@ build_predictive_model:
   agent: model_builder
   context: [clean_data, select_features]
 
-
 # ---------------------------------------------------------------------------
 #  6  EXECUTIVE SUMMARY ─────────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
@@ -165,24 +201,101 @@ summarize_findings:
     Craft an executive-level summary for non-technical stakeholders.
 
     Use:
-      - `model_type`, `metrics`, `feature_importance_path`, 
-      `output/technical-metrics.md` (from model_builder).
+      - `model_type`, `metrics`, `feature_importance_path`,
       - earlier narratives and outputs if helpful.
 
-    Must include:
-      - 2-3 sentence plain-language overview  
-      - 3-5 bullet key insights  
-      - a one-sentence recommendation  
-      - embedded feature-importance image:
+    Include:
+      - A short overview of what the data shows and what was done
+      - 3–5 key takeaways in bullet form
+      - A one-sentence recommendation (e.g., "use this model", "investigate this feature", etc.)
+      - An embedded image of the top feature importances:
           <img src="plots/feature_importances.png" width="600" />
+
+    📊 Expected focus:
+      - High-impact metrics
+        - classification problem: {classification_metrics}
+        - regression problem: {regression_metrics}
+      - Mention if additional plots (like {expected_plots}) helped shape your conclusion
+
+    🛠️ Use plain, stakeholder-friendly language.
   expected_output: >
-    Markdown file `output/final-insight-summary.md` with all of the above.
+    Markdown file `output/final-insight-summary.md` containing:
+
+    ## ✅ Executive Summary
+    - 2–3 sentence narrative overview of what the data reveals
+    - What analysis was performed and what model was selected and why it was selected
+
+    ## ✅ Key Insights
+    - 3–5 bullet points summarizing important findings, correlations, or warnings
+
+    ## ✅ Recommendation
+    - Clear, actionable next step
+
+    ## ✅ Embedded Visuals
+    - At least one image embed like:
+      <img src="plots/feature_importances.png" width="600" />
+    - Mention if additional plots were considered from: {expected_plots}
+
+    ## ✅ Metrics Summary
+    - Use either classification or regression metrics:
+      - classification: {classification_metrics}
+      - regression: {regression_metrics}
+
+    ## ✅ Final Checklist
+    - Summary stats ✔  
+    - Key insight bullets ✔  
+    - Final model + metrics ✔  
+    - Embedded visual ✔  
+    - Dashboard launched ✔  
   agent: insight_reporter
   context: [build_predictive_model]
   output_file: output/final-insight-summary.md
 
 # ---------------------------------------------------------------------------
-#  7  LAUNCH DASHBOARD 🚀 ───────────────────────────────────────────────────
+#  7  VALIDATE SUMMARY CHECKLIST ✅
+# ---------------------------------------------------------------------------
+validate_summary:
+  description: >
+    Run a final checklist audit on the summary report `output/final-insight-summary.md`.
+
+    Use FileReadTool to open and audit: `output/final-insight-summary.md`.
+
+    Confirm presence of:
+      - Executive summary section
+      - 3–5 bullet insights
+      - Embedded image(s)
+      - One or more model metrics
+      - Mention of the dashboard or application launch
+
+    For each, mark whether it's ✅ present or ❌ missing.  
+    Provide short suggestions if any part is missing.
+
+    Also use FileWriterTool to save a short log file:
+      - Filename (parameter: `filename`): `summary_qc_log.txt`
+      - Content (parameter: `content`) should include:
+        - Timestamp of validation
+        - Checklist pass/fail results
+        - A one-line summary verdict ("✅ Passed" or "❌ Failed")
+      - Directory (parameter: `directory`): `output/`
+
+    📎 Refer to earlier agent outputs if needed.
+
+  expected_output: >
+    A markdown checklist report confirming each item, e.g.:
+    ```
+    ## Final Report Checklist
+    - ✅ Executive summary present
+    - ✅ Bullet insights included
+    - ✅ Model metrics mentioned
+    - ❌ Dashboard not mentioned → Add a sentence about user access
+    ```
+    ➕ Log file: `output/summary_qc_log.txt` should be created with timestamp and pass/fail.
+  agent: quality_checker
+  context: [summarize_findings]
+  output_file: output/final-report-checklist.md
+
+# ---------------------------------------------------------------------------
+#  8  LAUNCH DASHBOARD 🚀 ───────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
 launch_dashboard:
   description: >
@@ -197,5 +310,5 @@ launch_dashboard:
     A message confirming the dashboard URL, e.g.:
     "Dashboard launched on http://localhost:8501"
   agent: insight_reporter
-  context: [summarize_findings]
+  context: [validate_summary]
   

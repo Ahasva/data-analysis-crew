@@ -40,17 +40,68 @@ Which feature in the given data has the gravest impact on the patient,
 resulting in diabetes?
 """
 
+# Core model types to suggest — not dictate
+AVAILABLE_MODELS = {
+    "classification": [
+        "logistic_reg",           # Logistic Regression
+        "random_forest",          # Random Forest
+        "svm",                    # Support Vector Machine
+        "knn",                    # K-Nearest Neighbors
+        "gradient_boosted_trees", # Gradient Boosting (e.g. XGBoost, LightGBM)
+        "naive_bayes",            # Gaussian / Multinomial Naive Bayes
+        "decision_tree",          # Decision Tree
+        "mlp_classifier",         # Neural network classifier
+    ],
+    "regression": [
+        "linear_regression",      # Ordinary Least Squares
+        "ridge",                  # Ridge Regression (L2)
+        "lasso",                  # Lasso Regression (L1)
+        "elastic_net",            # Combined L1 + L2
+        "random_forest",          # Ensemble method
+        "svm",                    # Support Vector Regression
+        "gradient_boosted_trees", # Boosted Regression Trees
+        "mlp_regressor",          # Neural Network regressor
+        "k_neighbors_regressor",  # KNN for regression
+]
+}
+
+# Metrics by problem type
+METRICS_BY_TYPE = {
+    "classification": [
+      "accuracy", "precision", "recall", "f1", "roc_auc", "confusion_matrix"
+    ],
+    "regression": [
+      "r2_score", "mean_squared_error", "mean_absolute_error", "rmse"
+    ]
+}
+
+# Required plots for visual validation (dashboard)
+EXPECTED_PLOTS = [
+    "feature_importances.png",
+    "confusion_matrix.png",
+    "roc_curve.png",
+    "precision_recall.png",
+    "model_score_comparison.png"
+]
+
+
 # ─────────────────────────────────────── main helpers ─────────────────────────────────────
 def run() -> None:
     """Run the full data-analysis crew pipeline."""
     inputs = {
-        "dataset_path"       : str(REL_PATH_DATA),
-        "request"            : REQUEST,
-        "output_dir"         : str(OUTPUT_DIR_REL),                  # output
-        "plot_path"          : str(PLOT_PATH_REL),                   # output/plots
-        "install_hint"       : INSTALL_LIB_TEMPLATE,
-        "available_libraries": AVAILABLE_LIBRARIES,
-        "datetime"           : datetime.now(timezone.utc).isoformat()
+        "dataset_path"           : str(REL_PATH_DATA),
+        "request"                : REQUEST,
+        "output_dir"             : str(OUTPUT_DIR_REL),
+        "plot_path"              : str(PLOT_PATH_REL),
+        "install_hint"           : INSTALL_LIB_TEMPLATE,
+        "available_libraries"    : AVAILABLE_LIBRARIES,
+        "datetime"               : datetime.now(timezone.utc).isoformat(),
+        #"available_models"       : AVAILABLE_MODELS,
+        "classification_models"  : ", ".join(AVAILABLE_MODELS["classification"]),
+        "regression_models"      : ", ".join(AVAILABLE_MODELS["regression"]),
+        "classification_metrics" : ", ".join(METRICS_BY_TYPE["classification"]),
+        "regression_metrics"     : ", ".join(METRICS_BY_TYPE["regression"]),
+        "expected_plots"         : EXPECTED_PLOTS
     }
 
     try:
@@ -67,6 +118,7 @@ def run() -> None:
         result = crew.kickoff(inputs=inputs)
 
         print("\n✅ Analysis completed.")
+        validate_final_summary(OUTPUT_DIR_ABS)
         print("🌐  Opening dashboard...")
 
         return result
@@ -123,9 +175,36 @@ def test():
     except Exception as e:
         raise RuntimeError(f"[TEST ERROR] Failed to test the crew: {e}") from e
 
+def validate_final_summary(output_path: Path):
+    """Simple checklist validator for final summary report."""
+    summary_file = output_path / "final-insight-summary.md"
+    if not summary_file.exists():
+        print("❌ final-insight-summary.md not found.")
+        return
+
+    content = summary_file.read_text(encoding="utf-8").lower()
+
+    checks = {
+        "✔ summary section"      : "executive summary" in content,
+        "✔ bullet insights"      : "-" in content or "*" in content,
+        "✔ embedded visual"      : "<img " in content,
+        "✔ metrics present"      : any(metric in content for metric in METRICS_BY_TYPE["classification"] + METRICS_BY_TYPE["regression"]),
+        "✔ dashboard mentioned"  : "dashboard" in content or "http://localhost" in content
+    }
+
+    print("\n🔍 Final Report Checklist:")
+    log_path = output_path / "final-checklist.log"
+    with log_path.open("w", encoding="utf-8") as f:
+        for desc, passed in checks.items():
+            result = '✅' if passed else '❌'
+            print(f"{desc:<30} {result}")
+            f.write(f"{desc:<28} {'OK' if passed else 'MISSING'}\n")
+    print(f"📝 Checklist log saved to: {log_path}")
+
 # ─────────────────────────────── script launch ───────────────────────────────
 if __name__ == "__main__":
     run()
     print("Dashboard launched 🚀  "
           "(Ctrl-C here won't stop it; close the browser tab or "
           "press Ctrl-C in the Streamlit terminal)")
+    
