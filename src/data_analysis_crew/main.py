@@ -93,21 +93,22 @@ EXPECTED_PLOTS = [
 def run() -> None:
     """Run the full data-analysis crew pipeline."""
     inputs = {
-        "file_name"              : FILE_NAME,
-        "root_folder"            : ROOT_FOLDER,
-        "dataset_path"           : str(REL_PATH_DATA),
-        "request"                : REQUEST,
-        "output_dir"             : str(OUTPUT_DIR_REL),
-        "plot_path"              : str(PLOT_PATH_REL),
-        "install_hint"           : INSTALL_LIB_TEMPLATE,
-        "available_libraries"    : AVAILABLE_LIBRARIES,
-        "datetime"               : datetime.now(timezone.utc).isoformat(),
-        #"available_models"       : AVAILABLE_MODELS,
-        "classification_models"  : ", ".join(AVAILABLE_MODELS["classification"]),
-        "regression_models"      : ", ".join(AVAILABLE_MODELS["regression"]),
-        "classification_metrics" : ", ".join(METRICS_BY_TYPE["classification"]),
-        "regression_metrics"     : ", ".join(METRICS_BY_TYPE["regression"]),
-        "expected_plots"         : ", ".join(EXPECTED_PLOTS)
+        "file_name"             : FILE_NAME,
+        "root_folder"           : ROOT_FOLDER,
+        "dataset_path"          : str(REL_PATH_DATA),
+        "raw_path"              : str(REL_PATH_DATA),
+        "cleaned_path"          : f"{ROOT_FOLDER}/{FILE_NAME[:-4]}_cleaned.csv",
+        "request"               : REQUEST,
+        "output_dir"            : str(OUTPUT_DIR_REL),
+        "plot_path"             : str(PLOT_PATH_REL),
+        "install_hint"          : INSTALL_LIB_TEMPLATE,
+        "available_libraries"   : AVAILABLE_LIBRARIES,
+        "datetime"              : datetime.now(timezone.utc).isoformat(),
+        "classification_models" : AVAILABLE_MODELS["classification"],
+        "regression_models"     : AVAILABLE_MODELS["regression"],
+        "classification_metrics": METRICS_BY_TYPE["classification"],
+        "regression_metrics"    : METRICS_BY_TYPE["regression"],
+        "expected_plots"        : EXPECTED_PLOTS
     }
 
     try:

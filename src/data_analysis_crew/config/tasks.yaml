@@ -35,23 +35,20 @@ load_data:
 clean_data:
   description: >
     template_variables:
-    - dataset_path
+    - raw_path              # raw CSV path, from load_data
+    - cleaned_path          # where to write/read the cleaned CSV
 
     Tidy up the raw dataset.
 
     Call `load_or_clean` with these inputs:
     ```python
     {
-      "raw_path": "{dataset_path}",
-      "cleaned_path": "{root_folder}/{file_name[:-4]}_cleaned.csv"
+      "raw_path": "{raw_path}",
+      "cleaned_path": "{cleaned_path}"
     }
-    
+    ```
     - If the cleaned file exists, it’ll be re-used.
-    - If "{root_folder}/{file_name[:-4]}_cleaned.csv" exists → just load it, gather
-      metadata, and return – **do not** re-clean.  
-    - Else → read "{root_folder}/{file_name[:-4]}_cleaned.csv", normalise column names
-      (lower-snake-case), fix missing values / constants, then save to the
-      same cleaned path.
+    - Else → read `raw_path`, normalize column names (lower-snake-case), save to `cleaned_path`.
 
     Always `print()` the cleaned file path as **the first line of STDOUT** so
     the Code-Interpreter tool captures it.
@@ -60,7 +57,7 @@ clean_data:
 
     ```python
     from data_analysis_crew.tools import load_or_clean
-    df = load_or_clean()            # ← re-uses cache or cleans afresh
+    df = load_or_clean(raw_path="...", cleaned_path="...")  # re-use or clean
     ```
 
     After cleaning assemble the `CleanedDataOutput` fields:
@@ -68,7 +65,7 @@ clean_data:
       • final_features / numeric_features / categorical_features  
       • dropped_columns / imputation_summary
   expected_output: >
-    1  First STDOUT line → `"{root_folder}/{file_name[:-4]}_cleaned.csv"`  
+    1  First STDOUT line → `"{cleaned_path}"`  
     2  Markdown block:
        – cleaning steps  
        – final feature × dtype table  
@@ -82,6 +79,9 @@ clean_data:
 explore_data:
   description: >
     template_variables:
+    - cleaned_path          # path to the cleaned CSV from clean_data
+    - numeric_features      # list[str] of numeric cols from clean_data
+    - categorical_features  # list[str] of categorical cols from clean_data
     - plot_path
     - expected_plots
 
@@ -133,12 +133,15 @@ explore_data:
 select_features:
   description: >
     template_variables:
+    - top_correlations       # strongest correlations from explore_data
+    - numeric_features       # so we know which cols to consider  
+    - categorical_features
     - request
     - classification_metrics
     - regression_metrics
     - classification_models
     - regression_models
-
+ 
     Based on the goal:
 
         {request}
@@ -310,31 +313,27 @@ summarize_findings:
 # ---------------------------------------------------------------------------
 validate_summary:
   description: >
-    template_variables:
-    - filename
-    - directory
-
     Run a final checklist audit on the summary report `output/final-insight-summary.md`.
+    
+    - Use FileReadTool to open and audit `output/final-insight-summary.md`.  
+    - Confirm presence of:
+      • Executive summary section  
+      • 3–5 bullet insights  
+      • Embedded image(s)  
+      • One or more model metrics  
+      • Mention of the dashboard or application launch  
+    - For each, mark ✅ present or ❌ missing and add a brief suggestion if missing.
+    
+    After the audit, write a log file `summary_qc_log.txt` into the `output/` folder
+    (use FileWriterTool). The log should include timestamp, pass/fail flags, and a final verdict.
 
-    Use FileReadTool to open and audit: `output/final-insight-summary.md`.
-
-    Confirm presence of:
-      - Executive summary section
-      - 3–5 bullet insights
-      - Embedded image(s)
-      - One or more model metrics
-      - Mention of the dashboard or application launch
-
-    For each, mark whether it's ✅ present or ❌ missing.  
-    Provide short suggestions if any part is missing.
-
-    Also use FileWriterTool to save a short log file:
-      - Filename (parameter: `filename`): `summary_qc_log.txt`
-      - Content (parameter: `content`) should include:
-        - Timestamp of validation
-        - Checklist pass/fail results
-        - A one-line summary verdict ("✅ Passed" or "❌ Failed")
-      - Directory (parameter: `directory`): `output/`
+      How the FileWriterTool works to save a short log file:
+        - Filename (parameter: `filename`): `summary_qc_log.txt`
+        - Content (parameter: `content`) should include:
+          - Timestamp of validation
+          - Checklist pass/fail results
+          - A one-line summary verdict ("✅ Passed" or "❌ Failed")
+        - Directory (parameter: `directory`): `output/`
 
     📎 Refer to earlier agent outputs if needed.
 

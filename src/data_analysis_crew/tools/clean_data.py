@@ -9,27 +9,30 @@ from crewai.tools import tool
 # ---------------------------------------------------------------------
 @tool("load_or_clean")
 def load_or_clean(
-    raw_path: str = "knowledge/diabetes.csv",
-    cleaned_path: str = None,
+    raw_path: str,
+    cleaned_path: str,
 ) -> dict:
     """
-    – If cleaned_path exists → load & return (no re-processing).
-    – Else → read raw_path, normalize column names, save & return.
+    – If `cleaned_path` exists → load & return (no re-processing).
+    – Else → read `raw_path`, normalize column names, save & return.
     """
-
+    # Determine project root (3 levels up)
     PROJECT_ROOT = Path(__file__).resolve().parents[3]
 
-    if cleaned_path is None:
-        cleaned_path = "knowledge/diabetes_cleaned.csv"
+    # Build absolute paths from inputs
+    raw = Path(raw_path)
+    clean = Path(cleaned_path)
+    if not raw.is_absolute():
+        raw = PROJECT_ROOT / raw
+    if not clean.is_absolute():
+        clean = PROJECT_ROOT / clean
 
-    raw   = PROJECT_ROOT / raw_path
-    clean = PROJECT_ROOT / cleaned_path
-
-    # load or clean
+    # Load existing cleaned file, or process raw
     if clean.exists():
         df = pd.read_csv(clean)
     else:
         df = pd.read_csv(raw)
+        # Normalize column names to lower_snake_case
         df.columns = (
             df.columns
               .str.strip()
@@ -38,11 +41,12 @@ def load_or_clean(
         )
         df.to_csv(clean, index=False)
 
+    # Return rich metadata for downstream tasks
     return {
-        "cleaned_path"        : str(clean),
-        "final_features"      : df.columns.tolist(),
+        "cleaned_path": str(clean),
+        "final_features": df.columns.tolist(),
         "categorical_features": [],
-        "numeric_features"    : df.select_dtypes("number").columns.tolist(),
-        "dropped_columns"     : [],
-        "imputation_summary"  : None
+        "numeric_features": df.select_dtypes(include="number").columns.tolist(),
+        "dropped_columns": [],
+        "imputation_summary": None
     }
