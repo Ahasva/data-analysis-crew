@@ -11,7 +11,10 @@
 load_data:
   description: >
     template_variables:
-      - dataset_path
+      - dataset_path   # the literal path to the raw CSV
+    tool_input:
+      - dataset_path: "{inputs[dataset_path]}"
+        
 
     Load the CSV dataset using the exact *literal* path in `{dataset_path}`.
     ⚠️ Do **not** search or list directories.
@@ -48,21 +51,40 @@ load_data:
 # ---------------------------------------------------------------------------
 clean_data:
   description: >
-    template_variables:
-      - raw_path        # raw CSV path (from load_data)
-      - cleaned_path    # where to write/read the cleaned CSV
+    Clean the dataset.
+
+    ⚙️ Expected resolved variables:
+      - raw_path        → {inputs[raw_path]}
+      - cleaned_path    → {inputs[cleaned_path]}
+
+    # 🧠 These values are passed from `main.py` via crew.kickoff(inputs=...) 
+    # 🧠 They resolve to:
+    #   {inputs[raw_path]}       → knowledge/diabetes.csv
+    #   {inputs[dataset_path]}   → same as raw_path (used for legacy compatibility)
+    #   {inputs[cleaned_path]}   → knowledge/diabetes_cleaned.csv
 
     Tidy up the raw dataset.
-
-    Call `load_or_clean` with these inputs:
+    
+    Call `load_or_clean` with these inputs (all three are required):
     ```python
     {
-      "raw_path": "{raw_path}",
+      "raw_path":     "{raw_path}",
+      "dataset_path": "{raw_path}",
       "cleaned_path": "{cleaned_path}"
     }
     ```
-    - If the cleaned file exists, it’ll be re-used.
-    - Else → read `raw_path`, normalize column names (lower-snake-case), save to `cleaned_path`.
+    Or use tool_input:
+      - raw_path: "{inputs[raw_path]}"
+      - dataset_path: "{inputs[dataset_path]}"
+      - cleaned_path: "{inputs[cleaned_path]}"
+
+    template_variables:
+      - raw_path        # the literal path to the raw CSV
+      - cleaned_path    # where to write/read the cleaned CSV
+
+    - If the cleaned file exists, it’ll be reused.
+    - Else → read the CSV at `{raw_path}`, normalize column names
+      (lower-snake-case), save to `{cleaned_path}`.
 
     Always `print()` the cleaned file path as **the first line of STDOUT** so
     the Code-Interpreter tool captures it.
@@ -382,4 +404,3 @@ launch_dashboard:
     "Dashboard launched on http://localhost:8501"
   agent: insight_reporter
   context: [validate_summary]
-  

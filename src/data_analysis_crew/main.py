@@ -5,6 +5,7 @@ Run with  `crewai run`  or  `python -m data_analysis_crew.main`
 """
 import sys
 import warnings
+import json
 from pathlib import Path
 from datetime import datetime, timezone
 from data_analysis_crew.utils.instructions import INSTALL_LIB_TEMPLATE, AVAILABLE_LIBRARIES
@@ -46,7 +47,9 @@ def run() -> None:
         "regression_metrics"    : METRICS_BY_TYPE["regression"],
         "expected_plots"        : EXPECTED_PLOTS
     }
-
+    # ─── DEBUG: show exactly what we’re sending into the crew ─────────────────
+    print("🚧 DEBUG: pipeline inputs →")
+    print(json.dumps(inputs, indent=2))
     try:
         crew = DataAnalysisCrew().crew()
 

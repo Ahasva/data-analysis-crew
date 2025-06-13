@@ -84,7 +84,7 @@ print(f"\t{FUNCTION_CALLING_LLM}:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNC
 print(f"\tfunction_calling_llm:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNCTION_CALLING_LLM.temperature})")
 
 # ======= GLOBAL PATHS & TOOLS =======
-print(f"💾\tUsed data:\t{FILE_NAME}\n🧭\tRelative path:\t{str(REL_PATH_DATA)}\n")
+print(f"\n💾\tUsed data:\t{FILE_NAME}\n🧭\tRelative path:\t{str(REL_PATH_DATA)}\n")
 
 csv_source = CSVKnowledgeSource(file_paths=[FILE_NAME])
 csv_search = CSVSearchTool(csv=str(REL_PATH_DATA))
@@ -335,7 +335,8 @@ RUN pip install --upgrade pip && \\
         return Task(
             config=self.tasks_config["build_predictive_model"],
             context=[self.clean_data(), self.select_features()],
-            output_json=ModelOutput,
+            output_pydantic=ModelOutput,
+            #output_json=ModelOutput,
             output_file="output/model-report.json"
         )
 
