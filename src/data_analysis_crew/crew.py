@@ -368,7 +368,7 @@ RUN pip install --upgrade pip && \\
     def launch_dashboard(self) -> Task:
         return Task(
             config=self.tasks_config["launch_dashboard"],
-            context=[self.summarize_findings()],
+            context=[self.validate_summary()],
             output_file=None
         )
 

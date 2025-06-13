@@ -12,9 +12,13 @@ from data_analysis_crew.crew import DataAnalysisCrew
 
 warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 
+# ─────────────────────────────────────── variables ───────────────────────────────────────
+FILE_NAME = "diabetes.csv"
+ROOT_FOLDER = "knowledge"
+
 # ───────────────────────────────────────── paths ─────────────────────────────────────────
 PROJECT_ROOT  = Path(__file__).resolve().parents[2]
-DATA_FILE     = PROJECT_ROOT / "knowledge" / "diabetes.csv"
+DATA_FILE     = PROJECT_ROOT / ROOT_FOLDER / FILE_NAME
 REL_PATH_DATA = DATA_FILE.relative_to(PROJECT_ROOT)
 
 OUTPUT_DIR_ABS = PROJECT_ROOT / "output"
@@ -89,6 +93,8 @@ EXPECTED_PLOTS = [
 def run() -> None:
     """Run the full data-analysis crew pipeline."""
     inputs = {
+        "file_name"              : FILE_NAME,
+        "root_folder"            : ROOT_FOLDER,
         "dataset_path"           : str(REL_PATH_DATA),
         "request"                : REQUEST,
         "output_dir"             : str(OUTPUT_DIR_REL),
@@ -101,7 +107,7 @@ def run() -> None:
         "regression_models"      : ", ".join(AVAILABLE_MODELS["regression"]),
         "classification_metrics" : ", ".join(METRICS_BY_TYPE["classification"]),
         "regression_metrics"     : ", ".join(METRICS_BY_TYPE["regression"]),
-        "expected_plots"         : EXPECTED_PLOTS
+        "expected_plots"         : ", ".join(EXPECTED_PLOTS)
     }
 
     try:
@@ -116,10 +122,7 @@ def run() -> None:
         print("📂 Plot path      :", inputs["plot_path"])
 
         result = crew.kickoff(inputs=inputs)
-
-        print("\n✅ Analysis completed.")
-        validate_final_summary(OUTPUT_DIR_ABS)
-        print("🌐  Opening dashboard...")
+        print("🚀 Dashboard launch has been delegated to the crew.")
 
         return result
 
@@ -204,7 +207,3 @@ def validate_final_summary(output_path: Path):
 # ─────────────────────────────── script launch ───────────────────────────────
 if __name__ == "__main__":
     run()
-    print("Dashboard launched 🚀  "
-          "(Ctrl-C here won't stop it; close the browser tab or "
-          "press Ctrl-C in the Streamlit terminal)")
-    

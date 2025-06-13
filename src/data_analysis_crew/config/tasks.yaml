@@ -39,13 +39,17 @@ clean_data:
 
     Tidy up the raw dataset.
 
-    Use the `load_or_clean` tool with:
-      - raw_path = {dataset_path}
-      - cleaned_path = knowledge/diabetes_cleaned.csv
+    Call `load_or_clean` with these inputs:
+    ```python
+    {
+      "raw_path": "{dataset_path}",
+      "cleaned_path": "{root_folder}/{file_name[:-4]}_cleaned.csv"
+    }
+    
     - If the cleaned file exists, it’ll be re-used.
-    - If **knowledge/diabetes_cleaned.csv** exists → just load it, gather
+    - If "{root_folder}/{file_name[:-4]}_cleaned.csv" exists → just load it, gather
       metadata, and return – **do not** re-clean.  
-    - Else → read **knowledge/diabetes.csv**, normalise column names
+    - Else → read "{root_folder}/{file_name[:-4]}_cleaned.csv", normalise column names
       (lower-snake-case), fix missing values / constants, then save to the
       same cleaned path.
 
@@ -64,7 +68,7 @@ clean_data:
       • final_features / numeric_features / categorical_features  
       • dropped_columns / imputation_summary
   expected_output: >
-    1  First STDOUT line → `knowledge/diabetes_cleaned.csv`  
+    1  First STDOUT line → `"{root_folder}/{file_name[:-4]}_cleaned.csv"`  
     2  Markdown block:
        – cleaning steps  
        – final feature × dtype table  
@@ -117,7 +121,7 @@ explore_data:
     Finish with a markdown summary of your findings, including embedded images and key correlations.
   expected_output: >
     Markdown report with:
-      - 2–5 image embeds (use <img src="…" width="600" />)
+      - 2–5 image embeds (use <img src="…" width="480" />)
       - table of strongest correlations
       - 3–5 bullet summary insights
   agent: data_analyst
@@ -224,8 +228,10 @@ build_predictive_model:
 
     🛑 Do **not** hard-code or guess the model name. The tool handles selection.
 
-    For all embedded plots in markdown, use:
-    <img src="plots/feature_importances.png" width="600" />
+    🖼️ The tool must save visualizations to {plot_path}, such as:
+    - output/plots/feature_importances.png
+    - output/plots/confusion_matrix.png
+    These will be embedded later by the reporting agent.
   expected_output: >
     - `output/model-report.json` with selected model, metrics, summary, paths
     - `output/plots/feature_importances.png` (+ confusion_matrix.png if classification)  
@@ -257,7 +263,7 @@ summarize_findings:
       - 3–5 key takeaways in bullet form
       - A one-sentence recommendation (e.g., "use this model", "investigate this feature", etc.)
       - An embedded image of the top feature importances:
-          <img src="plots/feature_importances.png" width="600" />
+          <img src="plots/feature_importances.png" width="480" />
 
     📊 Expected focus:
       - High-impact metrics
@@ -281,7 +287,7 @@ summarize_findings:
 
     ## ✅ Embedded Visuals
     - At least one image embed like:
-      <img src="plots/feature_importances.png" width="600" />
+      <img src="plots/feature_importances.png" width="480" />
     - Mention if additional plots were considered from: {expected_plots}
 
     ## ✅ Metrics Summary
