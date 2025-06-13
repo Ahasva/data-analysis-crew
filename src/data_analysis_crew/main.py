@@ -32,7 +32,7 @@ def run() -> None:
         "file_name"             : FILE_NAME,
         "root_folder"           : ROOT_FOLDER,
         "dataset_path"          : str(REL_PATH_DATA),
-        "raw_path"              : str(REL_PATH_DATA),
+        "raw_path"              : str(REL_PATH_DATA), 
         "cleaned_path"          : f"{ROOT_FOLDER}/{FILE_NAME[:-4]}_cleaned.csv",
         "request"               : REQUEST,
         "output_dir"            : str(OUTPUT_DIR_REL),

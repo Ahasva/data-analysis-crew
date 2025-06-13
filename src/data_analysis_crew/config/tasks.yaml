@@ -1,9 +1,9 @@
-# =============================================================================
+# ============================================================================
 #  DATA ANALYSIS CREW - TASK DEFINITIONS
-# =============================================================================
+# ============================================================================
 # Global path conventions
-# - `plot_path`   = output/plots   ← all .png visualizations saved here
-# - `output_dir`  = output/        ← all .md reports, .json model results, logs
+# - `plot_path`   = output/plots  ← all .png visualizations saved here
+# - `output_dir`  = output/       ← all .md reports, .json model results, logs
 
 # ---------------------------------------------------------------------------
 #  1  LOAD ──────────────────────────────────────────────────────────────────
@@ -11,21 +11,35 @@
 load_data:
   description: >
     template_variables:
-    - dataset_path
+      - dataset_path
 
     Load the CSV dataset using the exact *literal* path in `{dataset_path}`.
     ⚠️ Do **not** search or list directories.
 
-    Use pandas to:
-      • read the file  
-      • `print()` shape and column names  
-      • report missing-value counts and inferred dtypes  
+    Use Python (via the CodeInterpreterTool) and pandas to:
 
+    ```python
+    import pandas as pd
+
+    # 1. Read the CSV
+    df = pd.read_csv("{dataset_path}")
+
+    # 2. Print shape and column names
+    print(df.shape)
+    print(list(df.columns))
+
+    # 3. Missing-value counts
+    print(df.isnull().sum().to_dict())
+
+    # 4. Inferred dtypes
+    print(df.dtypes.astype(str).to_dict())
+    ```
     Dataset Path (string): **{dataset_path}**
   expected_output: >
-    - Dataset shape  
-    - `dtype_map` (column → dtype)  
-    - `missing_values` (column → #missing)  
+    - A printed tuple for the shape, e.g. `(768, 9)`  
+    - A printed list of column names  
+    - A printed dict of missing‐value counts  
+    - A printed dict of column → dtype  
     - Path actually read/written
   agent: data_engineer
 
@@ -35,8 +49,8 @@ load_data:
 clean_data:
   description: >
     template_variables:
-    - raw_path              # raw CSV path, from load_data
-    - cleaned_path          # where to write/read the cleaned CSV
+      - raw_path        # raw CSV path (from load_data)
+      - cleaned_path    # where to write/read the cleaned CSV
 
     Tidy up the raw dataset.
 
@@ -57,7 +71,7 @@ clean_data:
 
     ```python
     from data_analysis_crew.tools import load_or_clean
-    df = load_or_clean(raw_path="...", cleaned_path="...")  # re-use or clean
+    df = load_or_clean(raw_path="{raw_path}", cleaned_path="{cleaned_path}")
     ```
 
     After cleaning assemble the `CleanedDataOutput` fields:
@@ -74,7 +88,7 @@ clean_data:
   context: [load_data]
 
 # ---------------------------------------------------------------------------
-#  3  EXPLORE ────────────────────────────────────────────────────────────────
+#  3  EXPLORE ───────────────────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
 explore_data:
   description: >
@@ -128,7 +142,7 @@ explore_data:
   context: [clean_data]
 
 # ---------------------------------------------------------------------------
-#  4  FEATURE SELECTION ──────────────────────────────────────────────────────
+#  4  FEATURE SELECTION ─────────────────────────────────────────────────────
 # ---------------------------------------------------------------------------
 select_features:
   description: >

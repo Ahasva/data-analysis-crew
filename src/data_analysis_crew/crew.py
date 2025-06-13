@@ -84,7 +84,7 @@ print(f"\t{FUNCTION_CALLING_LLM}:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNC
 print(f"\tfunction_calling_llm:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNCTION_CALLING_LLM.temperature})")
 
 # ======= GLOBAL PATHS & TOOLS =======
-print(f"💾\tUsed data:\t{FILE_NAME}\n🧭Relative path:\t{str(REL_PATH_DATA)}\n")
+print(f"💾\tUsed data:\t{FILE_NAME}\n🧭\tRelative path:\t{str(REL_PATH_DATA)}\n")
 
 csv_source = CSVKnowledgeSource(file_paths=[FILE_NAME])
 csv_search = CSVSearchTool(csv=str(REL_PATH_DATA))
@@ -172,6 +172,7 @@ RUN pip install --upgrade pip && \\
                 tool for tool in [
                     self.code_interpreter,
                     install_dependency,
+                    explore_data,
                     file_reader,
                     csv_search,
                     load_or_clean
@@ -222,6 +223,7 @@ RUN pip install --upgrade pip && \\
                 tool for tool in [
                     self.code_interpreter,
                     install_dependency,
+                    explore_data,
                     csv_search,
                     build_predictive_model
                 ] if tool is not None

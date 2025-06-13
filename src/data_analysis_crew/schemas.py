@@ -6,40 +6,78 @@ from pydantic import BaseModel, Field
 # ======= OUTPUT SCHEMAS =======
 class LoadDataOutput(BaseModel):
     dataset_path: str = Field(description="Path to the loaded dataset")
-    # ⚠️  Fix: add `items` so OpenAI function schema is valid
+    # JSON schema for array items required by OpenAI
     shape: Tuple[int, int] = Field(
         description="Shape of the dataset (rows, columns)",
         json_schema_extra={
-            "items": {"type": "integer"},  # <— required by OpenAI
+            "items": {"type": "integer"},
             "minItems": 2,
             "maxItems": 2,
         },
     )
-    columns: List[str] = Field(description="List of dataset columns")
-    dtype_map: Optional[Dict[str, str]] = Field(default=None, description="Data type for each column")
-    missing_values: Optional[Dict[str, int]] = Field(default=None, description="Count of missing values per column")
+    columns: List[str] = Field(
+        description="List of dataset columns",
+        json_schema_extra={"items": {"type": "string"}}
+    )
+    dtype_map: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Data type for each column"
+    )
+    missing_values: Optional[Dict[str, int]] = Field(
+        default=None,
+        description="Count of missing values per column"
+    )
 
 class CleanedDataOutput(BaseModel):
     cleaned_path: str = Field(description="Path to the cleaned dataset file")
-    final_features: List[str] = Field(description="List of features retained after cleaning")
-    categorical_features: List[str] = Field(description="List of identified categorical features")
-    numeric_features: List[str] = Field(description="List of identified numerical features")
-    dropped_columns: List[str] = Field(description="List of columns dropped during cleaning")
-    imputation_summary: Optional[Dict[str, str]] = Field(default=None, description="Summary of how missing values were handled")
+    final_features: List[str] = Field(
+        description="List of features retained after cleaning",
+        json_schema_extra={"items": {"type": "string"}}
+    )
+    categorical_features: List[str] = Field(
+        description="List of identified categorical features",
+        json_schema_extra={"items": {"type": "string"}}
+    )
+    numeric_features: List[str] = Field(
+        description="List of identified numerical features",
+        json_schema_extra={"items": {"type": "string"}}
+    )
+    dropped_columns: List[str] = Field(
+        description="List of columns dropped during cleaning",
+        json_schema_extra={"items": {"type": "string"}}
+    )
+    imputation_summary: Optional[Dict[str, str]] = Field(
+        default=None,
+        description="Summary of how missing values were handled"
+    )
 
 class FeatureCorrelation(BaseModel):
     feature: str = Field(description="Feature name")
     correlation: float = Field(description="Correlation coefficient with the target")
 
 class ExplorationOutput(BaseModel):
-    plot_paths: List[str] = Field(description="Paths to saved plots from data exploration")
-    top_correlations: List[FeatureCorrelation] = Field(description="Top correlated features with the target")
-    anomalies: List[str] = Field(description="List of potential data anomalies")
+    plot_paths: List[str] = Field(
+        description="Paths to saved plots from data exploration",
+        json_schema_extra={"items": {"type": "string"}}
+    )
+    top_correlations: List[FeatureCorrelation] = Field(
+        description="Top correlated features with the target",
+        json_schema_extra={"items": {"$ref": "#/components/schemas/FeatureCorrelation"}}
+    )
+    anomalies: List[str] = Field(
+        description="List of potential data anomalies",
+        json_schema_extra={"items": {"type": "object"}}
+    )
     statistical_notes: str = Field(description="Narrative summary of statistical insights")
 
 class FeatureSelectionOutput(BaseModel):
-    problem_type: Literal["classification", "regression"] = Field(description="Inferred ML problem type")
-    top_features: List[str] = Field(description="List of selected top features")
+    problem_type: Literal["classification", "regression"] = Field(
+        description="Inferred ML problem type"
+    )
+    top_features: List[str] = Field(
+        description="List of selected top features",
+        json_schema_extra={"items": {"type": "string"}}
+    )
     reasoning: str = Field(description="Explanation for selected features and problem type")
 
 class ModelOutput(BaseModel):
@@ -56,9 +94,11 @@ class ModelOutput(BaseModel):
 
     # ── evaluation ──────────────────────────────────────────────────────
     metrics: Dict[str, float] = Field(
-        description="Primary evaluation metrics. "
-                    "For classification: {'accuracy','f1'}; "
-                    "for regression: {'r2','mse'}."
+        description=(
+            "Primary evaluation metrics. "
+            "For classification: {'accuracy','f1'}; "
+            "for regression: {'r2','mse'}."
+        )
     )
     plain_summary: str = Field(
         description="Short one-liner summarising the metrics (shown on the dashboard card)."
@@ -67,17 +107,16 @@ class ModelOutput(BaseModel):
     # ── artefacts (optional because some models lack importances) ───────
     feature_importance_path: Optional[str] = Field(
         default=None,
-        description="Relative path to feature-importance PNG "
-                    "(may be None if not supported)."
+        description="Relative path to feature-importance PNG (may be None if not supported)."
     )
     secondary_plot_paths: Optional[List[str]] = Field(
-    default=None,
-    description="List of paths to additional plots like ROC, PR, residuals, etc."
-)
+        default=None,
+        description="List of paths to additional plots like ROC, PR, residuals, etc.",
+        json_schema_extra={"items": {"type": "string"}}
+    )
 
     # ── legacy alias for confusion matrix ───────────────────────────────
     confusion_matrix_path: Optional[str] = Field(
         default=None,
-        description="(DEPRECATED) alias of `secondary_plot_path` when "
-                    "`problem_type=='classification'`."
+        description="(DEPRECATED) alias of `secondary_plot_paths` when `problem_type=='classification'`."
     )
