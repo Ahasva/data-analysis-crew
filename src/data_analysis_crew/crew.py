@@ -33,7 +33,7 @@ from data_analysis_crew.schemas import (
     ModelOutput
 )
 # ─── import centralized paths ─────────────────────────────────────────────────
-from data_analysis_crew.main import FILE_NAME, REL_PATH_DATA
+from data_analysis_crew.settings import FILE_NAME, REL_PATH_DATA
 
 # ======= LOAD ENVIRONMENT VARIABLES =======
 load_dotenv()
