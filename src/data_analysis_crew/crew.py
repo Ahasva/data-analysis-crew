@@ -32,6 +32,8 @@ from data_analysis_crew.schemas import (
     FeatureSelectionOutput,
     ModelOutput
 )
+# ─── import centralized paths ─────────────────────────────────────────────────
+from data_analysis_crew.main import FILE_NAME, REL_PATH_DATA
 
 # ======= LOAD ENVIRONMENT VARIABLES =======
 load_dotenv()
@@ -82,26 +84,13 @@ print(f"\t{FUNCTION_CALLING_LLM}:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNC
 print(f"\tfunction_calling_llm:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNCTION_CALLING_LLM.temperature})")
 
 # ======= GLOBAL PATHS & TOOLS =======
-DATA_FOLDER = "knowledge"
-FILE_NAME = "diabetes.csv"
-
-PROJECT_ROOT = Path(__file__).resolve().parents[2]
-FOLDER_PATH = Path(DATA_FOLDER)
-RELATIVE_PATH = Path(DATA_FOLDER) / FILE_NAME
+print(f"💾\tUsed data:\t{FILE_NAME}\n🧭Relative path:\t{str(REL_PATH_DATA)}\n")
 
 csv_source = CSVKnowledgeSource(file_paths=[FILE_NAME])
-csv_search = CSVSearchTool(csv=str(RELATIVE_PATH))
-
-print("✅ FOLDER_PATH (resolved):", (PROJECT_ROOT / FOLDER_PATH).resolve())
-print("✅ RELATIVE_PATH (resolved):", (RELATIVE_PATH).resolve())
-print("✅ FOLDER_PATH (resolved):", PROJECT_ROOT / FOLDER_PATH)
-print("✅ RELATIVE_PATH:", str(RELATIVE_PATH))
-print("✅ FILE_NAME:", str(FILE_NAME))
-
+csv_search = CSVSearchTool(csv=str(REL_PATH_DATA))
 directory_reader = DirectoryReadTool()
 file_reader = FileReadTool()
 file_writer = FileWriterTool()
-
 
 # ======= CREW =======
 @CrewBase

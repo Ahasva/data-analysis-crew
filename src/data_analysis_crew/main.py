@@ -16,6 +16,9 @@ warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
 FILE_NAME = "diabetes.csv"
 ROOT_FOLDER = "knowledge"
 
+# Exposition of variables for import by other modules (e.g. crew.py)
+__all__ = ["FILE_NAME", "ROOT_FOLDER", "REL_PATH_DATA", "run"]
+
 # ───────────────────────────────────────── paths ─────────────────────────────────────────
 PROJECT_ROOT  = Path(__file__).resolve().parents[2]
 DATA_FILE     = PROJECT_ROOT / ROOT_FOLDER / FILE_NAME
@@ -66,7 +69,7 @@ AVAILABLE_MODELS = {
         "gradient_boosted_trees", # Boosted Regression Trees
         "mlp_regressor",          # Neural Network regressor
         "k_neighbors_regressor",  # KNN for regression
-]
+    ]
 }
 
 # Metrics by problem type
