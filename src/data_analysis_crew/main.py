@@ -3,67 +3,54 @@
 Entry-point for the Data-Analysis Crew pipeline
 Run with  `crewai run`  or  `python -m data_analysis_crew.main`
 """
+import os
 import sys
-import warnings
-import json
 from pathlib import Path
+import json
 from datetime import datetime, timezone
+from data_analysis_crew.settings import (
+    FILE_NAME, ROOT_FOLDER, DASHBOARD_FILE, OUTPUT_DIR, PLOT_PATH,
+    REQUEST, AVAILABLE_MODELS, METRICS_BY_TYPE, EXPECTED_PLOTS
+)
 from data_analysis_crew.utils.instructions import INSTALL_LIB_TEMPLATE, AVAILABLE_LIBRARIES
 from data_analysis_crew.crew import DataAnalysisCrew
 
-# ─── centralized settings ───────────────────────────────────────────────────────────────
-from data_analysis_crew.settings import (
-    FILE_NAME,
-    ROOT_FOLDER,
-    REL_PATH_DATA,
-    OUTPUT_DIR_REL,
-    PLOT_PATH_REL,
-    REQUEST,
-    AVAILABLE_MODELS,
-    METRICS_BY_TYPE,
-    EXPECTED_PLOTS,
-)
-
-warnings.filterwarnings("ignore", category=SyntaxWarning, module="pysbd")
-
-# ─────────────────────────────────────── main helpers ─────────────────────────────────────
 def run() -> None:
     """Run the full data-analysis crew pipeline."""
+    
+    output_path = Path(OUTPUT_DIR)
+    output_path.mkdir(parents=True, exist_ok=True)
+    (output_path / "plots").mkdir(parents=True, exist_ok=True)
+
+    cleaned_filename = FILE_NAME.replace(".csv", "_cleaned.csv")
+
     inputs = {
-        "file_name"             : FILE_NAME,
-        "root_folder"           : ROOT_FOLDER,
-        "dataset_path"          : str(REL_PATH_DATA),
-        "raw_path"              : str(REL_PATH_DATA), 
-        "cleaned_path"          : f"{ROOT_FOLDER}/{FILE_NAME[:-4]}_cleaned.csv",
-        "request"               : REQUEST,
-        "output_dir"            : str(OUTPUT_DIR_REL),
-        "plot_path"             : str(PLOT_PATH_REL),
-        "install_hint"          : INSTALL_LIB_TEMPLATE,
-        "available_libraries"   : AVAILABLE_LIBRARIES,
-        "datetime"              : datetime.now(timezone.utc).isoformat(),
-        "classification_models" : AVAILABLE_MODELS["classification"],
-        "regression_models"     : AVAILABLE_MODELS["regression"],
+        "dashboard_file": DASHBOARD_FILE,
+        "root_folder": ROOT_FOLDER,
+        "dataset_path": os.path.join(ROOT_FOLDER, FILE_NAME),
+        "raw_path": os.path.join(ROOT_FOLDER, FILE_NAME),
+        "cleaned_path": os.path.join(ROOT_FOLDER, cleaned_filename),
+        "output_dir": OUTPUT_DIR,
+        "plot_path": PLOT_PATH,
+        "request": REQUEST,
+        "install_hint": INSTALL_LIB_TEMPLATE,
+        "available_libraries": AVAILABLE_LIBRARIES,
+        "datetime": datetime.now(timezone.utc).isoformat(),
+        "available_models": AVAILABLE_MODELS,
+        "classification_models": AVAILABLE_MODELS["classification"],
+        "regression_models": AVAILABLE_MODELS["regression"],
         "classification_metrics": METRICS_BY_TYPE["classification"],
-        "regression_metrics"    : METRICS_BY_TYPE["regression"],
-        "expected_plots"        : EXPECTED_PLOTS
+        "regression_metrics": METRICS_BY_TYPE["regression"],
+        "expected_plots": EXPECTED_PLOTS
     }
-    # ─── DEBUG: show exactly what we’re sending into the crew ─────────────────
+
     print("🚧 DEBUG: pipeline inputs →")
     print(json.dumps(inputs, indent=2))
+
     try:
         crew = DataAnalysisCrew().crew()
-
-        print("\n🧭 Planned task order:")
-        for t in crew.tasks:
-            print(f"→ {t.agent.role:<22} : {t.description.splitlines()[0]}")
-
-        print("🧾 Passing dataset:", inputs["dataset_path"])
-        print("📁 Output path    :", inputs["output_dir"])
-        print("📂 Plot path      :", inputs["plot_path"])
-
         result = crew.kickoff(inputs=inputs)
         print("🚀 Dashboard launch has been delegated to the crew.")
-
         return result
 
     except Exception as e:

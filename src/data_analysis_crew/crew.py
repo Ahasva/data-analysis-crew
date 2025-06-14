@@ -52,7 +52,8 @@ AGENT_LLMS = {
     ),
     "data_analyst": LLM(
         model=ANTHROPIC_MODEL_NAME,
-        temperature=0.3
+        #model=OPENAI_MODEL_NAME,
+        temperature=0.25
     ),
     "model_builder": LLM(
         model=OPENAI_MODEL_NAME,
@@ -202,7 +203,7 @@ RUN pip install --upgrade pip && \\
                 ] if tool is not None
             ],
             function_calling_llm=FUNCTION_CALLING_LLM,
-            max_execution_time=180,
+            max_execution_time=300,
             memory=True,
             verbose=True,
             allow_delegation=False,
@@ -286,7 +287,7 @@ RUN pip install --upgrade pip && \\
         return Agent(
             config=self.agents_config["data_project_manager"],
             llm=AGENT_LLMS["data_project_manager"],
-            tools=[],
+            #tools=[],
             allow_code_execution=False,
             code_execution_mode="safe",
             memory=True,

@@ -32,7 +32,7 @@ st.header("📋 Executive Summary")
 if REPORT_MD.exists():
     raw = REPORT_MD.read_text()
 
-    # Extract structured blocks from the MD
+    # 1) Extract the Embedded Visuals and Metrics Summary blocks
     emb_match = re.search(
         r'##\s*✅\s*Embedded Visuals\s*\n([\s\S]*?)(?=\n##\s*✅|\Z)',
         raw
@@ -45,26 +45,26 @@ if REPORT_MD.exists():
     )
     metrics_block = metrics_match.group(1) if metrics_match else None
 
-    # Clean out all ✅ sections and unwanted elements for narrative
+    # 2) Remove all ✅-sections and unwanted artifacts to isolate narrative, insights, recommendation
     cleaned = raw
-    # drop all ✅ headings and their content
+    # drop entire sections for Embedded Visuals, Metrics Summary, Final Checklist
     cleaned = re.sub(r'(?m)^##\s*✅\s*Embedded Visuals[\s\S]*?(?=\n##|\Z)', "", cleaned)
     cleaned = re.sub(r'(?m)^##\s*✅\s*Metrics Summary[\s\S]*?(?=\n##|\Z)',    "", cleaned)
     cleaned = re.sub(r'(?m)^##\s*✅\s*Final Checklist[\s\S]*',                  "", cleaned)
-    cleaned = re.sub(r'(?m)^##\s*✅.*$',                                      "", cleaned)
-    # strip out any image tags
+    # drop any remaining ✅ headings
+    cleaned = re.sub(r'(?m)^##\s*✅.*$',                                    "", cleaned)
+    # strip out image tags and markdown image embeds
     cleaned = re.sub(r'<img\s+src="[^"]+"[^>]*>', "", cleaned)
     cleaned = re.sub(r'!\[.*?\]\([^)]+\)',      "", cleaned)
-    # strip out any leftover checklist bullets
+    # strip out any checklist bullets
     cleaned = re.sub(r'(?m)^\s*[-*]\s.*[✔✖].*$', "", cleaned)
-    # collapse multiple blank lines
+    # collapse excessive blank lines
     cleaned = re.sub(r'\n{3,}', "\n\n", cleaned).strip()
 
-    # Split into narrative, key insights, recommendation
+    # 3) Split into narrative, key insights, recommendation
     lines = cleaned.splitlines()
     bullet_start = next((i for i, L in enumerate(lines) if L.lstrip().startswith("- ")), len(lines))
     narrative = "\n".join(lines[:bullet_start]).strip()
-
     end = bullet_start
     while end < len(lines) and (lines[end].lstrip().startswith("- ") or not lines[end].strip()):
         end += 1
@@ -145,7 +145,7 @@ if model_data:
     if model_data.get("metrics"):
         st.subheader("📈 Metrics")
         for nm, val in model_data["metrics"].items():
-            st.markdown(f"- **{nm.title()}**: `{val:.4f}`➡️`{(val*100):.2f}%`")
+            st.markdown(f"- **{nm.title()}**: `{val:.4f}`")
 
     # Model comparison chart
     if isinstance(model_data.get("all_model_scores"), dict):
@@ -153,12 +153,11 @@ if model_data:
         st.bar_chart(model_data["all_model_scores"])
 
     # Hyperparameters
-    best_params = None
     if tm_text:
-        m = re.search(r'```json\s*(\{[\s\S]+?\})\s*```', tm_text)
-        if m:
+        hp = re.search(r'```json\s*(\{[\s\S]+?\})\s*```', tm_text)
+        if hp:
             try:
-                best_params = json.loads(m.group(1))
+                best_params = json.loads(hp.group(1))
                 model_data["best_params"] = best_params
             except json.JSONDecodeError:
                 st.warning("⚠️ Could not parse JSON hyperparameters.")
@@ -206,7 +205,7 @@ def _resolve(path_str):
 
 visuals, titles = [], []
 
-# **New**: Correlation heatmap (EDA plot)
+# Correlation heatmap
 corr_path = _resolve("plots/correlation_heatmap.png")
 if corr_path.exists():
     visuals.append(corr_path)

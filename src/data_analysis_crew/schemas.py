@@ -81,7 +81,7 @@ class ModelOutput(BaseModel):
     target: str = Field(
         description="Name of the target column that was predicted."
     )
-    metrics: Dict[str, float] = Field(
+    metrics: Optional[Dict[str, float]] = Field(
         description=(
             "Primary evaluation metrics. "
             "For classification: {'accuracy','f1'}; "
@@ -102,4 +102,8 @@ class ModelOutput(BaseModel):
     confusion_matrix_path: Optional[str] = Field(
         default=None,
         description="(DEPRECATED) alias of `secondary_plot_paths` when `problem_type=='classification'`."
+    )
+    residuals_plot_path: Optional[str] = Field(
+        default=None,
+        description="Path to the residuals scatter plot for regression models."
     )

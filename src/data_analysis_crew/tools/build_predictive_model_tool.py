@@ -10,18 +10,16 @@ including model comparison, feature importances, and diagnostic charts.
 import matplotlib
 matplotlib.use("Agg")  # noqa: E402
 import matplotlib.pyplot as plt  # noqa: E402
-
 import json
 from pathlib import Path
 from typing import Any, Dict, Union
-
+from pydantic import ValidationError
 import shap
 import pandas as pd
 from crewai.tools import tool
 from data_analysis_crew.schemas import ModelOutput
 from data_analysis_crew.utils.utils import to_posix_relative_path
 from data_analysis_crew.utils.project_root import get_project_root
-
 from sklearn.ensemble import (
     RandomForestClassifier, RandomForestRegressor,
     GradientBoostingClassifier, GradientBoostingRegressor,
@@ -178,7 +176,7 @@ def build_predictive_model(
 
     # --- Pick best model ---
     best_name = max(scores, key=lambda k: scores[k][0])
-    best_score, best_model, y_pred = scores[best_name]
+    _, best_model, y_pred = scores[best_name]
     model_type = type(best_model).__name__
 
     # ─── Generate plots ─────────────────────────────────────────────────────────
@@ -211,23 +209,39 @@ def build_predictive_model(
             disp.figure_.savefig(root_cm)
             secondary_paths.append(to_posix_relative_path(cm_png, PROJECT_ROOT))
             if hasattr(best_model, "predict_proba"):
-                y_proba = best_model.predict_proba(X_test)[:,1]
+                y_proba = best_model.predict_proba(X_test)[:, 1]
+
+                # ROC
                 roc_png = plots_dir / "roc_curve.png"
                 root_roc = out_dir / "roc_curve.png"
                 RocCurveDisplay.from_predictions(y_test, y_proba).figure_.savefig(roc_png)
                 RocCurveDisplay.from_predictions(y_test, y_proba).figure_.savefig(root_roc)
                 secondary_paths.append(to_posix_relative_path(roc_png, PROJECT_ROOT))
+
+                # PR Curve
+                pr_png = plots_dir / "precision_recall.png"
+                root_pr = out_dir / "precision_recall.png"
+                PrecisionRecallDisplay.from_predictions(y_test, y_proba).figure_.savefig(pr_png)
+                PrecisionRecallDisplay.from_predictions(y_test, y_proba).figure_.savefig(root_pr)
+                secondary_paths.append(to_posix_relative_path(pr_png, PROJECT_ROOT))
         else:
-            # regression residuals
-            resid_png = plots_dir / "residuals.png"
-            fig, ax = plt.subplots(figsize=(6,4))
-            ax.scatter(y_test, y_pred, alpha=0.6)
-            ax.plot([y_test.min(), y_test.max()],[y_test.min(), y_test.max()],"k--")
-            ax.set_xlabel("Actual"); ax.set_ylabel("Predicted"); ax.set_title("Residuals")
-            fig.tight_layout()
-            fig.savefig(resid_png)
-            plt.close(fig)
-            secondary_paths.append(to_posix_relative_path(resid_png, PROJECT_ROOT))
+            try:
+                resid_png = plots_dir / "residuals.png"
+                root_resid = out_dir / "residuals.png"
+                fig, ax = plt.subplots(figsize=(6, 4))
+                ax.scatter(y_test, y_pred, alpha=0.6)
+                ax.plot([y_test.min(), y_test.max()], [y_test.min(), y_test.max()], "k--")
+                ax.set_xlabel("Actual")
+                ax.set_ylabel("Predicted")
+                ax.set_title("Residuals")
+                fig.tight_layout()
+                fig.savefig(resid_png)
+                fig.savefig(root_resid)
+                plt.close(fig)
+                residuals_plot_path = to_posix_relative_path(resid_png, PROJECT_ROOT)
+                secondary_paths.append(residuals_plot_path)
+            except Exception as e:
+                print(f"❌ Residuals plot failed: {e}")
     except Exception as e:
         print(f"❌ Diagnostic plots failed: {e}")
 
@@ -324,6 +338,10 @@ def build_predictive_model(
         outputs["shap_summary_path"] = shap_path_str
     if residuals_path:
         outputs["residuals_path"] = to_posix_relative_path(residuals_path, PROJECT_ROOT)
+    
+    residuals_plot_path = next((p for p in secondary_paths if "residuals.png" in p), None)
+    if residuals_plot_path:
+        outputs["residuals_plot_path"] = residuals_plot_path
 
     report["outputs"] = outputs
 
@@ -357,6 +375,11 @@ def build_predictive_model(
         md.append(f"- Precision-Recall:\n  <img src=\"{pr}\" width=\"600\"/>")
     if outputs.get("shap_summary_path"):
         md.append(f"- SHAP Summary:\n  <img src=\"{outputs['shap_summary_path']}\" width=\"600\"/>")
+
+    # Residuals Plot (for regression)
+    resid = next((p for p in secondary_paths if "residuals" in p), None)
+    if resid:
+        md.append(f"- Residuals Plot:\n  <img src=\"{resid}\" width=\"600\"/>")
     if isinstance(best_model, GridSearchCV):
         md += ["\n## Best Hyperparameters:", "```json", json.dumps(best_model.best_params_, indent=2), "```"]
     md += ["", "## All Model Scores", "", "| Model | Score |", "|-------|-------|"]
@@ -366,13 +389,19 @@ def build_predictive_model(
 
     print(f"✅ Best model selected: {best_name}")
 
-    return ModelOutput(
-        model_type=model_type,
-        problem_type=problem_type,
-        target=target,
-        metrics=metrics,
-        plain_summary=plain,
-        feature_importance_path=feat_path_str,
-        secondary_plot_paths=secondary_paths,
-        confusion_matrix_path=outputs.get("confusion_matrix_path"),
-    )
+    try:
+        return ModelOutput(
+            model_type=model_type,
+            problem_type=problem_type,
+            target=target,
+            metrics=metrics,
+            plain_summary=plain,
+            feature_importance_path=feat_path_str,
+            secondary_plot_paths=secondary_paths,
+            confusion_matrix_path=outputs.get("confusion_matrix_path"),
+            residuals_plot_path = residuals_plot_path if problem_type == "regression" else None
+        )
+    except ValidationError as ve:
+        print("❌ ModelOutput validation failed:")
+        print(ve.json(indent=2))
+        raise
