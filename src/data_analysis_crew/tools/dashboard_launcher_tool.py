@@ -1,9 +1,10 @@
 # ── dashboard_launcher_tool.py ──
-from pathlib import Path
+import socket
 import subprocess
 import webbrowser
 import time
 from crewai.tools import tool
+from data_analysis_crew.utils.project_root import resolve_path
 
 @tool("launch_dashboard")
 def launch_dashboard(path: str = "dashboard.py", port: int = 8501) -> str:
@@ -22,14 +23,24 @@ def launch_dashboard(path: str = "dashboard.py", port: int = 8501) -> str:
     str
         Confirmation string with the URL that was opened.
     """
-    script_path = Path(path).expanduser().resolve()
-    subprocess.Popen([
-        "streamlit", "run", str(script_path),
-        "--server.port", str(port)
-    ])
+    script_path = resolve_path(path)
+    subprocess.Popen(
+        ["streamlit", "run", str(script_path), "--server.port", str(port)],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL
+    )
 
-    # 🔄 Optional: wait a few seconds for Streamlit server to start
-    time.sleep(15)
+    
+    def wait_for_port(port, timeout=15):
+        start = time.time()
+        while time.time() - start < timeout:
+            try:
+                with socket.create_connection(("localhost", port), timeout=1):
+                    return
+            except OSError:
+                time.sleep(0.5)
+
+    wait_for_port(port)
 
     url = f"http://localhost:{port}"
     try:

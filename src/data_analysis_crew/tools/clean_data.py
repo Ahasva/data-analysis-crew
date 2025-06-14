@@ -1,53 +1,62 @@
-from pathlib import Path
+import os
 import pandas as pd
+from pathlib import Path
+from typing import Optional
+
 from crewai.tools import tool
+from data_analysis_crew.schemas import CleanedDataOutput
+from data_analysis_crew.utils.utils import to_posix_relative_path
+from data_analysis_crew.utils.project_root import resolve_path, get_project_root
+
 
 @tool("load_or_clean")
 def load_or_clean(
-    raw_path: str = None,
-    dataset_path: str = None,
-    cleaned_path: str = None,
-) -> dict:
+    raw_path: Optional[str] = None,
+    dataset_path: Optional[str] = None,
+    cleaned_path: Optional[str] = None,
+) -> CleanedDataOutput:
     """
-    – If `cleaned_path` exists → load & return (no re-processing).
-    – Else → read from `raw_path` or `dataset_path`, normalize column names, save & return.
+    If `cleaned_path` exists, load and return metadata.
+    Otherwise:
+      - Read from `raw_path` or `dataset_path`
+      - Normalize column names (strip, lowercase, replace spaces with underscores)
+      - Save cleaned CSV to `cleaned_path`
+      - Return structured metadata using CleanedDataOutput schema.
     """
-    PROJECT_ROOT = Path(__file__).resolve().parents[3]
     source = raw_path or dataset_path
-    if source is None:
+    if not source:
         raise ValueError("Either `raw_path` or `dataset_path` must be provided.")
+    if not cleaned_path:
+        raise ValueError("Missing `cleaned_path` argument.")
 
-    raw = Path(source)
-    clean = Path(cleaned_path)
-    if not raw.is_absolute():
-        raw = PROJECT_ROOT / raw
-    if not clean.is_absolute():
-        clean = PROJECT_ROOT / clean
+    raw_file = resolve_path(source)
+    clean_file = resolve_path(cleaned_path)
 
-    print(f"🚧 DEBUG load_or_clean → raw_file   = {raw}")
-    print(f"🚧 DEBUG load_or_clean → clean_file = {clean}")
+    print(f"📂 Checking for existing cleaned file: {clean_file}")
 
-    if clean.exists():
-        print(f"📂 Loading existing cleaned file from: {clean}")
-        df = pd.read_csv(clean)
-        print(f"✅ Loaded {len(df)} rows from cleaned file.")
+    if clean_file.exists():
+        df = pd.read_csv(clean_file)
+        print(f"✅ Loaded existing cleaned file: {clean_file}")
     else:
-        print(f"🧹 Cleaning raw file: {raw}")
-        df = pd.read_csv(raw)
+        print(f"🧼 Cleaning raw file: {raw_file}")
+        df = pd.read_csv(raw_file)
         df.columns = (
             df.columns
             .str.strip()
             .str.lower()
             .str.replace(" ", "_", regex=False)
         )
-        df.to_csv(clean, index=False)
-        print(f"✅ Loaded {len(df)} rows from raw file and saved cleaned version to: {clean}")
+        clean_file.parent.mkdir(parents=True, exist_ok=True)
+        df.to_csv(clean_file, index=False)
+        print(f"✅ Saved new cleaned file: {clean_file}")
 
-    return {
-        "cleaned_path": str(clean),
-        "final_features": df.columns.tolist(),
-        "categorical_features": df.select_dtypes(include=['object', 'category']).columns.tolist(),
-        "numeric_features": df.select_dtypes(include="number").columns.tolist(),
-        "dropped_columns": [],  # Future improvement: track any removed cols
-        "imputation_summary": None  # Future improvement: fill method, stats
-    }
+    # Assemble output
+    cleaned_posix = to_posix_relative_path(clean_file.resolve(), get_project_root())
+    return CleanedDataOutput(
+        cleaned_path=cleaned_posix,
+        final_features=df.columns.tolist(),
+        categorical_features=df.select_dtypes(include=['object', 'category']).columns.tolist(),
+        numeric_features=df.select_dtypes(include='number').columns.tolist(),
+        dropped_columns=[],  # you can later extend logic to detect drops
+        imputation_summary=None  # extend in future with fillna tracking
+    )

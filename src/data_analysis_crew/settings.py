@@ -1,4 +1,6 @@
 # src/data_analysis_crew/settings.py
+import os
+from pathlib import Path
 
 # ────────────────────────────────── used data variables ──────────────────────────────────
 ROOT_FOLDER = "knowledge"
@@ -6,12 +8,13 @@ FILE_NAME = "diabetes.csv"
 
 DASHBOARD_FILE = "dashboard.py"
 
-# 🚨 Final relative input path
 REL_PATH_DATA = f"{ROOT_FOLDER}/{FILE_NAME}"
 
-# Clean output paths — used in tasks/main.py, not as actual path objects
+CLEANED_FILE = FILE_NAME.replace(".csv", "_cleaned.csv")
+CLEANED_PATH = os.path.join(ROOT_FOLDER, CLEANED_FILE)
+
 OUTPUT_DIR = "output"
-PLOT_PATH = "output/plots"
+PLOT_PATH = str(Path(OUTPUT_DIR) / "plots")
 
 # ───────────────────────────────────────── prompt ────────────────────────────────────────
 REQUEST = """
@@ -45,6 +48,7 @@ EXPECTED_PLOTS = [
 
 # ───────────────────────────────────────── __all__ ────────────────────────────────────────
 __all__ = [
-    "ROOT_FOLDER", "FILE_NAME", "REL_PATH_DATA", "OUTPUT_DIR", "PLOT_PATH",
-    "REQUEST", "AVAILABLE_MODELS", "METRICS_BY_TYPE", "EXPECTED_PLOTS"
+    "ROOT_FOLDER", "FILE_NAME", "REL_PATH_DATA", "CLEANED_FILE", "CLEANED_PATH",
+    "OUTPUT_DIR", "PLOT_PATH", "REQUEST", "AVAILABLE_MODELS", "METRICS_BY_TYPE", 
+    "EXPECTED_PLOTS"
 ]

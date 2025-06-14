@@ -30,7 +30,8 @@ from data_analysis_crew.schemas import (
     CleanedDataOutput,
     ExplorationOutput,
     FeatureSelectionOutput,
-    ModelOutput
+    ModelOutput,
+    SummaryReportOutput
 )
 # ─── import centralized paths ─────────────────────────────────────────────────
 from data_analysis_crew.settings import FILE_NAME, REL_PATH_DATA
@@ -346,28 +347,26 @@ RUN pip install --upgrade pip && \\
         return Task(
             config=self.tasks_config["summarize_findings"],
             context=[self.build_predictive_model()],
-            output_file="output/final-insight-summary.md"
+            output_pydantic=SummaryReportOutput
         )
     
     @task
     def validate_summary(self) -> Task:
         return Task(
             config=self.tasks_config["validate_summary"],
-            context=[self.summarize_findings()],
-            output_file="output/final-report-checklist.md"
+            context=[self.summarize_findings()]
         )
 
     @task
     def launch_dashboard(self) -> Task:
         return Task(
             config=self.tasks_config["launch_dashboard"],
-            context=[self.validate_summary()],
-            output_file=None
+            context=[self.validate_summary()]
         )
 
     # ── Crew Configuration ───────────────────────────────
     @crew
-    def crew(self) -> Crew:
+    def crew(self, **kwargs) -> Crew:
         non_manager_agents = [
             agent for agent in self.agents if agent != self.data_project_manager()
         ]
@@ -380,5 +379,6 @@ RUN pip install --upgrade pip && \\
             function_calling_llm=FUNCTION_CALLING_LLM,
             manager_agent=self.data_project_manager(),
             planning=True,
-            output_log_file="output/crew_log.json"
+            output_log_file="output/crew_log.json",
+            **kwargs
         )

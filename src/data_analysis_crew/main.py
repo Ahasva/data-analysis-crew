@@ -3,17 +3,43 @@
 Entry-point for the Data-Analysis Crew pipeline
 Run with  `crewai run`  or  `python -m data_analysis_crew.main`
 """
-import os
+
 import sys
 from pathlib import Path
 import json
+import time
 from datetime import datetime, timezone
 from data_analysis_crew.settings import (
-    FILE_NAME, ROOT_FOLDER, DASHBOARD_FILE, OUTPUT_DIR, PLOT_PATH,
+    ROOT_FOLDER, REL_PATH_DATA, CLEANED_PATH,
+    DASHBOARD_FILE, OUTPUT_DIR, PLOT_PATH,
     REQUEST, AVAILABLE_MODELS, METRICS_BY_TYPE, EXPECTED_PLOTS
 )
 from data_analysis_crew.utils.instructions import INSTALL_LIB_TEMPLATE, AVAILABLE_LIBRARIES
+from data_analysis_crew.utils.project_root import resolve_path
 from data_analysis_crew.crew import DataAnalysisCrew
+
+
+start_times = {}
+
+def on_step_callback(step_output):
+    task_id = getattr(step_output, 'task_id', 'unknown')
+    now = time.time()
+
+    if task_id not in start_times:
+        start_times[task_id] = now
+        print(f"🚀 Started task {task_id}")
+    else:
+        elapsed = now - start_times[task_id]
+        print(f"✅ Finished task {task_id} in {elapsed:.1f}s")
+
+    print("\n🔎 Step Callback Triggered")
+    print(f"🧠 Agent: {getattr(step_output, 'agent_name', 'N/A')}")
+    print(f"📋 Task: {getattr(step_output, 'task_description', 'N/A')[:100]}")
+    print(f"📤 Output:\n{getattr(step_output, 'output', step_output)}\n")
+
+    if "Delegate work to coworker" in str(step_output):
+        print("🤝 Delegation detected!")
+
 
 def run() -> None:
     """Run the full data-analysis crew pipeline."""
@@ -22,14 +48,12 @@ def run() -> None:
     output_path.mkdir(parents=True, exist_ok=True)
     (output_path / "plots").mkdir(parents=True, exist_ok=True)
 
-    cleaned_filename = FILE_NAME.replace(".csv", "_cleaned.csv")
-
     inputs = {
         "dashboard_file": DASHBOARD_FILE,
         "root_folder": ROOT_FOLDER,
-        "dataset_path": os.path.join(ROOT_FOLDER, FILE_NAME),
-        "raw_path": os.path.join(ROOT_FOLDER, FILE_NAME),
-        "cleaned_path": os.path.join(ROOT_FOLDER, cleaned_filename),
+        "dataset_path": REL_PATH_DATA,
+        "raw_path": REL_PATH_DATA,
+        "cleaned_path": CLEANED_PATH,
         "output_dir": OUTPUT_DIR,
         "plot_path": PLOT_PATH,
         "request": REQUEST,
@@ -44,11 +68,17 @@ def run() -> None:
         "expected_plots": EXPECTED_PLOTS
     }
 
+    print("\n------------------------------------------------\n")
+    print(f"✅ DEBUG: Absolute plot path = {resolve_path(PLOT_PATH).resolve()}")
+    print("\n------------------------------------------------\n")
+    print(f"⚠️ plot_path received: {inputs['plot_path']}")
+    print("\n------------------------------------------------\n")
     print("🚧 DEBUG: pipeline inputs →")
     print(json.dumps(inputs, indent=2))
+    print("\n------------------------------------------------\n")
 
     try:
-        crew = DataAnalysisCrew().crew()
+        crew = DataAnalysisCrew().crew(on_step_callback=on_step_callback)
         result = crew.kickoff(inputs=inputs)
         print("🚀 Dashboard launch has been delegated to the crew.")
         return result

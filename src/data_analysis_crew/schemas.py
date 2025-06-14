@@ -107,3 +107,20 @@ class ModelOutput(BaseModel):
         default=None,
         description="Path to the residuals scatter plot for regression models."
     )
+
+class SummaryReportOutput(BaseModel):
+    summary: str = Field(
+        description="A short executive summary of the findings, highlighting the key conclusions from the analysis and modeling."
+    )
+    insights: List[str] = Field(
+        description="A list of 3–5 bullet-point insights derived from the data exploration and modeling results."
+    )
+    recommendation: str = Field(
+        description="A clear, actionable recommendation based on the model’s performance and insights derived from the data."
+    )
+    metrics: Dict[str, float] = Field(
+        description="A dictionary of the key model performance metrics, such as accuracy, F1 score, R2, or MSE."
+    )
+    image_paths: List[str] = Field(
+        description="List of file paths to images (e.g. PNGs) generated during analysis or model training, such as feature importance or ROC curves."
+    )
