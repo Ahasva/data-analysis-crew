@@ -6,12 +6,13 @@
 load_data:
   description: >
     Load the dataset and return basic metadata: shape, column names, missing values, and types.
-    
-    Please use the tool `load_or_clean(raw_path="{raw_path}", cleaned_path="{cleaned_path}")`.
+
+    template_variables: [raw_path, dataset_path, cleaned_path]
 
     Use the `load_or_clean` tool with the following values:
-    - raw_path: {raw_path}
-    - cleaned_path: {cleaned_path}
+      For raw_path use {raw_path}.
+      For dataset_path use {dataset_path}.
+      For cleaned_path use {cleaned_path}.
 
     If the cleaned file exists, use it. Otherwise, clean the raw file, save to cleaned_path, and return the following:
     {
@@ -23,7 +24,7 @@ load_data:
 
     Do not skip or omit `cleaned_path` — it's mandatory for caching to work.
 
-    template_variables: [raw_path, cleaned_path]
+    
 
     Use Python (via CodeInterpreterTool), example:
     ```python
@@ -52,17 +53,18 @@ clean_data:
     - Handle missing values
     - Save to {cleaned_path}
 
-    template_variables: [raw_path, cleaned_path]
+    template_variables: [raw_path, dataset_path, cleaned_path]
 
     tool_input:
-      raw_path: "{raw_path}"
-      cleaned_path: "{cleaned_path}"
+      raw_path = {raw_path}
+      dataset_path = {dataset_path}
+      cleaned_path = {cleaned_path}
 
     If file exists, reuse. Else, clean from {raw_path}.
 
     Tool:
     ```python
-    load_or_clean(raw_path="{raw_path}", cleaned_path="{cleaned_path}")
+    load_or_clean(raw_path="raw_path", cleaned_path="cleaned_path")
     ```
   expected_output: >
     1. First line: the cleaned file path  
@@ -82,7 +84,7 @@ explore_data:
     - Add boxplots or pairplots if useful, 
     - Save ≥{expected_plots} plots to {plot_path}, 
     - Summarize key insights in Markdown, 
-    - Save ≥3 high-quality plots to {plot_path} (e.g. ./output/plots/*.png), 
+    - Save ≥3 high-quality plots to {plot_path} (e.g. output/plots/*.png), 
     - Use typical data science and machine learning libraries, e.g.: {available_libraries},
     Finish with a markdown summary of your findings, including embedded images and key correlations.
 
@@ -91,16 +93,16 @@ explore_data:
     from pathlib import Path
     Path({plot_path}).mkdir(parents=True, exist_ok=True)
     ```
-    The folder structure should be as follows: `./output/plots`.
+    The folder structure should be as follows: `output/plots`.
 
     template_variables:
       [cleaned_path, numeric_features, categorical_features, plot_path, expected_plots]
     
     tool_input:
-      cleaned_path: "{cleaned_path}"
-      numeric_features: "{numeric_features}"
-      plot_path: "{plot_path}"
-      expected_plots: "{expected_plots}"
+      cleaned_path = {cleaned_path}
+      numeric_features = {numeric_features}
+      plot_path = {plot_path}
+      expected_plots = {expected_plots}
   expected_output: >
     Markdown report with:
       - 2–5 image embeds (use <img src="…" width="480" />)
@@ -141,8 +143,8 @@ build_predictive_model:
     If it is a labeled dataset, find for "target variable" yourself. It is sometimes called "output" or "y label" etc.
     - Save files like .md or .json to {output_dir} and visuals of metrics (images like .png) to {plot_path}.
     - Auto-tune & compare models (based on {available_models}).
-    - Save all images like .png to `{plot_path}` (e.g. ./output/plots/)
-    - Save reports like .md and .json to `{output_dir}` (e.g. ./output/)
+    - Save all images like .png to `{plot_path}` (e.g. output/plots/)
+    - Save reports like .md and .json to `{output_dir}` (e.g. output/)
 
     template_variables:
       [root_folder, cleaned_path, output_dir, plot_path, available_models,
@@ -150,15 +152,15 @@ build_predictive_model:
       regression_metrics, expected_plots]
 
     tool_input:
-      root_folder: "{root_folder}"
-      data: "{cleaned_path}"
-      available_models: "{available_models}"
-      out_dir: "{output_dir}"
-      tuning: "true"
+      root_folder = {root_folder}
+      data = {cleaned_path}
+      available_models = {available_models}
+      out_dir = {output_dir}
+      tuning = "true"
   expected_output: >
-    - `./output/model-report.json` with selected model, metrics, summary, paths
-    - `./output/plots/feature_importance.png` (e.g confusion_matrix.png, residuals.png)  
-    - `./output/technical-metrics.md`
+    - `output/model-report.json` with selected model, metrics, summary, paths
+    - `output/plots/feature_importance.png` (e.g confusion_matrix.png, residuals.png)  
+    - `output/technical-metrics.md`
   agent: model_builder
   context: [clean_data, select_features]  
 
@@ -173,9 +175,9 @@ summarize_findings:
       [model_type, metrics, feature_importance_path, classification_metrics,
       regression_metrics, expected_plots]
     
-    Embed example image: `<img src="./output/plots/feature_importance.png" width="480" />`
+    Embed example image: `<img src="output/plots/feature_importance.png" width="480" />`
   expected_output: >
-    Create a markdown file, not a JSON `./output/final-insight-summary.md` containing:
+    Create a markdown file, not a JSON `output/final-insight-summary.md` containing:
 
     ## ✅ Executive Summary
     - 2–3 sentence narrative overview of what the data reveals
@@ -188,7 +190,7 @@ summarize_findings:
     - Clear, actionable next step
 
     ## ✅ Embedded Visuals
-    - At least one image embed. Example image: `<img src="./output/plots/feature_importance.png" width="480" />`
+    - At least one image embed. Example image: `<img src="output/plots/feature_importance.png" width="480" />`
     - Mention if additional plots were considered from: {expected_plots}
 
     ## ✅ Metrics Summary
@@ -203,7 +205,7 @@ summarize_findings:
 validate_summary:
   description: >
     TASK:
-    Run a final checklist audit on the summary report `./output/final-insight-summary.md`.
+    Run a final checklist audit on the summary report `output/final-insight-summary.md`.
     Save results to `output/summary_qc_log.txt`.
     - For each, mark ✅ present or ❌ missing and add a brief suggestion if missing.
     
@@ -241,12 +243,12 @@ launch_dashboard:
     This tool launches the dashboard. Do not interpret this task as code generation or file writing.
     It must use the existing Streamlit script located at: {dashboard_file}.
 
-    Do not open `./{dashboard_file}`! Do not overwrite `./{dashboard_file}`!
+    Do not open `{dashboard_file}`! Do not overwrite `{dashboard_file}`!
 
     template_variables: [dashboard_file, port]
     tool_input:
-      path: {dashboard_file}
-      port: "8501"    
+      dashboard_file = {dashboard_file}
+      port = "8501"    
   expected_output: >
     "Dashboard launched on http://localhost:8501"
   agent: insight_reporter

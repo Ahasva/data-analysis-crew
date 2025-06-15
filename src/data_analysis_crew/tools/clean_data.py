@@ -1,8 +1,5 @@
-import os
 import pandas as pd
-from pathlib import Path
 from typing import Optional
-
 from crewai.tools import tool
 from data_analysis_crew.schemas import CleanedDataOutput
 from data_analysis_crew.utils.utils import to_posix_relative_path
@@ -57,6 +54,6 @@ def load_or_clean(
         final_features=df.columns.tolist(),
         categorical_features=df.select_dtypes(include=['object', 'category']).columns.tolist(),
         numeric_features=df.select_dtypes(include='number').columns.tolist(),
-        dropped_columns=[],  # you can later extend logic to detect drops
-        imputation_summary=None  # extend in future with fillna tracking
+        dropped_columns=[],  # Extend logic in the future
+        imputation_summary=None  # Extend logic in the future
     )
