@@ -5,7 +5,7 @@
 # 1. LOAD RAW CSV (Prompt-based, no custom tool)
 load_data:
   description: >
-    Load the dataset from `{raw_path}` and return basic metadata, like:
+    Load the dataset from `{raw_path}` and return basic metadata inside folder called `output/`, like:
     - DataFrame shape (rows, columns)
     - List of column names
     - Dictionary of missing values per column
@@ -36,11 +36,12 @@ load_data:
     }
     ```
   agent: data_engineer
+  output_file: output/{file_name}_metadata.json
 
 # 2. CLEAN DATA (Prompt-driven with Docker-based code interpreter)
 clean_data:
   description: >
-    Clean the dataset at `{raw_path}`:
+    Clean the dataset at `{raw_path}`!
     - Load the CSV using pandas
     - Normalize column names (lowercase, replace spaces with underscores)
     - Handle missing values intelligently (drop or fill)
@@ -49,32 +50,35 @@ clean_data:
       ```python
       df.to_csv(cleaned_path, index=False)
       ```
+    - Return a fully cleaned dataset that can be used for machine learning modeling
     - Return a confirmation message like: "Cleaned data saved to {cleaned_path}"
     
     Return:
     - Path to the cleaned file
     - Lists of final, numeric, and categorical features
-    - Optional: markdown summary of shape, column names, missing values handled
+    - Optional: JSON summary of shape, final_featureds, numeric_features, 
+    categorical_features, column_names, missing values handled
 
   expected_output: >
-    ```json
-    {
-    "cleaned_path": "{cleaned_path}",
-    "final_features": [...],
-    "numeric_features": [...],
-    "categorical_features": [...],
-    "summary_markdown": "..."
-    }
-    ```
+    - **MOST IMPORTANT**: fully cleaned dataset (CSV) based on {raw_path} saved to {cleaned_path}
+    - Secondary: JSON file with a structure like:
+      ```json
+      {
+      "cleaned_path": "{cleaned_path}",
+      "final_features": [...],
+      "numeric_features": [...],
+      "categorical_features": [...],
+      "summary_markdown": "..."
+      }
+      ```
   agent: data_engineer
   context: [load_data]
-  output_file: knowledge/diabetes_cleaned.csv
+  output_file: knowledge/{file_name}_cleaned.csv
 
 # 3. EXPLORE DATA
 explore_data:
   description: >
-    Perform an exploratory analysis of the cleaned dataset at `{cleaned_path}`:
-    
+    Perform an exploratory analysis of the cleaned dataset provided by the `clean_data` task!
     - Summarize the dataset using `df.describe(include="all")` and `df.info(verbose=True)`
     - Visualize distributions of numeric features
     - Generate a correlation heatmap
@@ -126,8 +130,7 @@ select_features:
 # 5. BUILD MODEL
 build_predictive_model:
   description: >
-    Train and evaluate Machine Learning models on the cleaned dataset at `{cleaned_path}`.
-
+    Train and evaluate Machine Learning models on the cleaned dataset produced by the `clean_data` task!
     - Auto-detect or confirm problem type (classification/regression)
     - Train and tune models from `{available_models}`
     - Save all visual outputs to `{plot_path}` (e.g. `output/plots/...`)

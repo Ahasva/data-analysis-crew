@@ -10,7 +10,7 @@ import json
 import time
 from datetime import datetime, timezone
 from data_analysis_crew.settings import (
-    ROOT_FOLDER, REL_PATH_DATA, CLEANED_PATH,
+    FILE_NAME, ROOT_FOLDER, REL_PATH_DATA, CLEANED_PATH,
     DASHBOARD_FILE, OUTPUT_DIR, PLOT_PATH,
     REQUEST, AVAILABLE_MODELS, METRICS_BY_TYPE, EXPECTED_PLOTS
 )
@@ -49,6 +49,7 @@ def run() -> None:
     (output_path / "plots").mkdir(parents=True, exist_ok=True)
 
     inputs = {
+        "file_name": FILE_NAME,
         "dashboard_file": DASHBOARD_FILE,
         "root_folder": ROOT_FOLDER,
         #"dataset_path": REL_PATH_DATA,
