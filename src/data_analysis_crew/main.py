@@ -51,7 +51,7 @@ def run() -> None:
     inputs = {
         "dashboard_file": DASHBOARD_FILE,
         "root_folder": ROOT_FOLDER,
-        "dataset_path": REL_PATH_DATA,
+        #"dataset_path": REL_PATH_DATA,
         "raw_path": REL_PATH_DATA,
         "cleaned_path": CLEANED_PATH,
         "output_dir": OUTPUT_DIR,

@@ -2,31 +2,16 @@
 #  DATA ANALYSIS CREW - TASK DEFINITIONS (cleaned & path-corrected)
 # ============================================================================
 
-# 1. LOAD RAW CSV
+# 1. LOAD RAW CSV (Prompt-based, no custom tool)
 load_data:
   description: >
-    Load the dataset and return basic metadata: shape, column names, missing values, and types.
+    Load the dataset from `{raw_path}` and return basic metadata, like:
+    - DataFrame shape (rows, columns)
+    - List of column names
+    - Dictionary of missing values per column
+    - Dictionary of data types per column
 
-    template_variables: [raw_path, dataset_path, cleaned_path]
-
-    Use the `load_or_clean` tool with the following values:
-      For raw_path use {raw_path}.
-      For dataset_path use {dataset_path}.
-      For cleaned_path use {cleaned_path}.
-
-    If the cleaned file exists, use it. Otherwise, clean the raw file, save to cleaned_path, and return the following:
-    {
-      "cleaned_path": cleaned_path,
-      "final_features": [...],
-      "numeric_features": [...],
-      "categorical_features": [...]
-    }
-
-    Do not skip or omit `cleaned_path` — it's mandatory for caching to work.
-
-    
-
-    Use Python (via CodeInterpreterTool), example:
+    Use Python and pandas to compute this information (via CodeInterpreterTool), example:
     ```python
     import pandas as pd
     df = pd.read_csv("{dataset_path}")
@@ -35,168 +20,152 @@ load_data:
     print(df.isnull().sum().to_dict())
     print(df.dtypes.astype(str).to_dict())
     ```
+
+    Your output must be returned as structured data, preferably CSV, 
+    that downstream agents can parse.
+
+    Required input:
+    - raw_path
   expected_output: >
-    - Tuple shape (rows, columns)  
-    - A dictionary with:
-      - cleaned_path
-      - final_features
-      - numeric_features
-      - categorical_features
+    ```json
+    {
+      "shape": [rows, columns],
+      "columns": [...],
+      "missing": {...},
+      "dtypes": {...}
+    }
+    ```
   agent: data_engineer
 
-# 2. CLEAN DATA
+# 2. CLEAN DATA (Prompt-driven with Docker-based code interpreter)
 clean_data:
   description: >
-    TASK:
-    Clean the dataset!:
-    - Normalize column names
-    - Handle missing values
-    - Save to {cleaned_path}
+    Clean the dataset at `{raw_path}`:
+    - Load the CSV using pandas
+    - Normalize column names (lowercase, replace spaces with underscores)
+    - Handle missing values intelligently (drop or fill)
+    - Ensure the directory for `{cleaned_path}` exists: {root_folder}
+    - Save the cleaned file to `{cleaned_path}` by calling:
+      ```python
+      df.to_csv(cleaned_path, index=False)
+      ```
+    - Return a confirmation message like: "Cleaned data saved to {cleaned_path}"
+    
+    Return:
+    - Path to the cleaned file
+    - Lists of final, numeric, and categorical features
+    - Optional: markdown summary of shape, column names, missing values handled
 
-    template_variables: [raw_path, dataset_path, cleaned_path]
-
-    tool_input:
-      raw_path = {raw_path}
-      dataset_path = {dataset_path}
-      cleaned_path = {cleaned_path}
-
-    If file exists, reuse. Else, clean from {raw_path}.
-
-    Tool:
-    ```python
-    load_or_clean(raw_path="raw_path", cleaned_path="cleaned_path")
-    ```
   expected_output: >
-    1. First line: the cleaned file path  
-    2. Markdown summary of changes, features, types, and missing values
+    ```json
+    {
+    "cleaned_path": "{cleaned_path}",
+    "final_features": [...],
+    "numeric_features": [...],
+    "categorical_features": [...],
+    "summary_markdown": "..."
+    }
+    ```
   agent: data_engineer
   context: [load_data]
+  output_file: knowledge/diabetes_cleaned.csv
 
 # 3. EXPLORE DATA
 explore_data:
   description: >
-    TASK:
-    Perform an exploratory analysis of the cleaned dataset: Analyze and visualize the dataset at {cleaned_path}:
-    - Describe the dataset statistically (e.g. `df.describe(include="all")`), 
-    - Visualize distributions of all numeric columns, 
-    - Show relationships using a correlation heatmap, 
-    - Investigate missing values, outliers, and collinearity, 
-    - Add boxplots or pairplots if useful, 
-    - Save ≥{expected_plots} plots to {plot_path}, 
-    - Summarize key insights in Markdown, 
-    - Save ≥3 high-quality plots to {plot_path} (e.g. output/plots/*.png), 
-    - Use typical data science and machine learning libraries, e.g.: {available_libraries},
-    Finish with a markdown summary of your findings, including embedded images and key correlations.
-
-    📁 Make sure this folder exists before saving plots:
-    ```python
-    from pathlib import Path
-    Path({plot_path}).mkdir(parents=True, exist_ok=True)
-    ```
-    The folder structure should be as follows: `output/plots`.
-
-    template_variables:
-      [cleaned_path, numeric_features, categorical_features, plot_path, expected_plots]
+    Perform an exploratory analysis of the cleaned dataset at `{cleaned_path}`:
     
-    tool_input:
-      cleaned_path = {cleaned_path}
-      numeric_features = {numeric_features}
-      plot_path = {plot_path}
-      expected_plots = {expected_plots}
+    - Summarize the dataset using `df.describe(include="all")` and `df.info(verbose=True)`
+    - Visualize distributions of numeric features
+    - Generate a correlation heatmap
+    - Identify outliers, collinearity, and missing values
+    - Use approved libraries from: {available_libraries}; use other libraries, if necessary
+    - Save at least 3 visualizations (e.g., heatmap, histograms) to folder structure `{plot_path}`: `output/plots/...`.
+
+    Notes:
+    - Focus on key statistical takeaways
+    - Ensure plots are informative for model-building
+    - Use built-in `explore_data` tool if available
+
   expected_output: >
-    Markdown report with:
-      - 2–5 image embeds (use <img src="…" width="480" />)
-      - table of strongest correlations
-      - 3–5 bullet summary insights
+    - Markdown report with:
+      • 2–5 embedded plots (`<img src="..."/>`)
+      • Top correlations with the target variable
+      • Bullet point summary (3–5 key findings)
   agent: data_analyst
   context: [clean_data]
 
 # 4. SELECT FEATURES
 select_features:
   description: >
-    TASK:
-    Pick the best features and problem type based on the user's request: {request}.
+    Based on the user's request `{request}`, determine:
+
+    - The appropriate problem type (classification or regression)
+    - The best features to use for modeling
+    - A suitable target variable
 
     Consider:
-      - {classification_metrics} vs {regression_metrics}
-      - top_correlations, outliers, and missingness, descriptive statistics,
-      variable type, anomalies, distributions, missing values etc. (data driven approach)
+    - Feature correlations, outliers, distributions, missingness, descriptive statistics, 
+    variable type, anomalies, distributions, missing values etc.
+    - Metrics and model families from:
+      - Classification: {classification_metrics}
+      - Regression: {regression_metrics}
 
-    template_variables:
-      [request, numeric_features, categorical_features, classification_models,
-      regression_models, classification_metrics, regression_metrics]
   expected_output: >
+    ```json
     {
       "top_features": [...],
       "problem_type": "classification",
       "target_variable": "...",
       "explanation": "..."
     }
+    ```
   agent: data_analyst
   context: [explore_data]
 
 # 5. BUILD MODEL
 build_predictive_model:
   description: >
-    TASK:
-    Train multiple models on {cleaned_path} (to be found in {root_folder} = "knowledge").
-    If it is a labeled dataset, find for "target variable" yourself. It is sometimes called "output" or "y label" etc.
-    - Save files like .md or .json to {output_dir} and visuals of metrics (images like .png) to {plot_path}.
-    - Auto-tune & compare models (based on {available_models}).
-    - Save all images like .png to `{plot_path}` (e.g. output/plots/)
-    - Save reports like .md and .json to `{output_dir}` (e.g. output/)
+    Train and evaluate Machine Learning models on the cleaned dataset at `{cleaned_path}`.
 
-    template_variables:
-      [root_folder, cleaned_path, output_dir, plot_path, available_models,
-      classification_models, regression_models, classification_metrics,
-      regression_metrics, expected_plots]
+    - Auto-detect or confirm problem type (classification/regression)
+    - Train and tune models from `{available_models}`
+    - Save all visual outputs to `{plot_path}` (e.g. `output/plots/...`)
+    - Save evaluation summaries to `{output_dir}` as `.json` and `.md`
 
-    tool_input:
-      root_folder = {root_folder}
-      data = {cleaned_path}
-      available_models = {available_models}
-      out_dir = {output_dir}
-      tuning = "true"
+    Use `build_predictive_model` tool if available.
+
   expected_output: >
-    - `output/model-report.json` with selected model, metrics, summary, paths
-    - `output/plots/feature_importance.png` (e.g confusion_matrix.png, residuals.png)  
-    - `output/technical-metrics.md`
+    - JSON report at `output/model-report.json`
+    - Plots at {plot_path} such as `feature_importance.png`, `confusion_matrix.png`, `residuals.png`, e.g `output/plots/feature_importance.png`
+    - Markdown summary: `output/technical-metrics.md`
+
   agent: model_builder
-  context: [clean_data, select_features]  
+  context: [clean_data, select_features]
 
 # 6. SUMMARY REPORT
 summarize_findings:
   description: >
-    TASK:
-    Craft an executive-level summary for non-technical stakeholders.
-    Summarize the modeling results with metrics and visuals. Focus on high-impact metrics.
+    Create an executive-level summary of the modeling results.
 
-    template_variables:
-      [model_type, metrics, feature_importance_path, classification_metrics,
-      regression_metrics, expected_plots]
-    
-    Embed example image: `<img src="output/plots/feature_importance.png" width="480" />`
+    - Summarize the selected model and its performance
+    - Embed plots (at least one, e.g. `<img src="..." width="480"/>`)
+    - Highlight 3–5 key insights
+    - Make a recommendation
+
+    Use metrics from:
+      - Classification: {classification_metrics}
+      - Regression: {regression_metrics}
+
   expected_output: >
-    Create a markdown file, not a JSON `output/final-insight-summary.md` containing:
-
-    ## ✅ Executive Summary
-    - 2–3 sentence narrative overview of what the data reveals
-    - What analysis was performed and what model was selected and why it was selected
-
-    ## ✅ Key Insights
-    - 3–5 bullet points summarizing important findings, correlations, or warnings
-
-    ## ✅ Recommendation
-    - Clear, actionable next step
-
-    ## ✅ Embedded Visuals
-    - At least one image embed. Example image: `<img src="output/plots/feature_importance.png" width="480" />`
-    - Mention if additional plots were considered from: {expected_plots}
-
-    ## ✅ Metrics Summary
-    - Use either classification or regression metrics:
-      - classification: {classification_metrics}
-      - regression: {regression_metrics}
+    A Markdown report saved as `output/final-insight-summary.md`, with:
+    - Executive summary (at least 2–3 sentence narrative overview of what the data reveals; 
+    what analysis was performed; what model was selected and why it was selected)
+    - Key insights (at least 3-5 bullet points, which summarize important findings, correlations, etc.)
+    - Recommendation (clear, actionable next steps)
+    - Embedded plots (use relative paths)
+    - Metrics summary table
+    (Use a header structure: ## ✅)
   agent: insight_reporter
   context: [build_predictive_model]
   output_file: output/final-insight-summary.md
@@ -204,31 +173,16 @@ summarize_findings:
 # 7. CHECKLIST VALIDATION
 validate_summary:
   description: >
-    TASK:
-    Run a final checklist audit on the summary report `output/final-insight-summary.md`.
-    Save results to `output/summary_qc_log.txt`.
-    - For each, mark ✅ present or ❌ missing and add a brief suggestion if missing.
-    
-    - After the audit, write a log file `summary_qc_log.txt` into the `output/` folder
-    (use FileWriterTool). The log should include timestamp, pass/fail flags, and a final verdict.
-    - Confirm presence of:
-      • Executive summary section  
-      • 3–5 bullet insights  
-      • Embedded image(s)  
-      • One or more model metrics  
-      • Mention of the dashboard or application launch 
-    
-    template_variables: [expected_plots]
+    Run a checklist audit on `output/final-insight-summary.md`:
+
+    - Confirm all required sections are present
+    - Flag missing components (plots, metrics, summaries) for each, mark ✅ present or ❌ missing
+    - Save results to `output/summary_qc_log.txt` 
+
+    Include timestamp, pass/fail flags, and fix suggestions.
   expected_output: >
-    A markdown checklist report confirming each item, e.g.:
-    ```
-    ## Final Report Checklist
-    - ✅ Executive summary present
-    - ✅ Bullet insights included
-    - ✅ Model metrics mentioned
-    - ❌ Dashboard not mentioned → Add a sentence about user access
-    ```
-    - `output/summary_qc_log.txt` with timestamp and pass/fail
+    - Markdown checklist report (e.g. ✅ Bullet insights included)
+    - Checklist saved as `output/summary_qc_log.txt`
   agent: quality_checker
   context: [summarize_findings]
   output_file: output/final-report-checklist.md
@@ -236,21 +190,14 @@ validate_summary:
 # 8. LAUNCH DASHBOARD
 launch_dashboard:
   description: >
-    TASK:
-    Launch the dashboard with the tool launch_dashboard:
-    `launch_dashboard(path="dashboard.py", port=8501)`
+    Launch the dashboard using the tool `launch_dashboard`.
 
-    This tool launches the dashboard. Do not interpret this task as code generation or file writing.
-    It must use the existing Streamlit script located at: {dashboard_file}.
+    Do not open or edit `{dashboard_file}`.
+    Simply run: `launch_dashboard(path="{dashboard_file}", port=8501)` after all other tasks finished
 
-    Do not open `{dashboard_file}`! Do not overwrite `{dashboard_file}`!
-
-    template_variables: [dashboard_file, port]
-    tool_input:
-      dashboard_file = {dashboard_file}
-      port = "8501"    
   expected_output: >
     "Dashboard launched on http://localhost:8501"
+
   agent: insight_reporter
   context: [validate_summary]
   

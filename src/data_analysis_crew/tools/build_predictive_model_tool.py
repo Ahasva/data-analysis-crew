@@ -17,6 +17,7 @@ from typing import Any, Dict, Union
 from pydantic import ValidationError
 import shap
 import pandas as pd
+from pandas.errors import EmptyDataError
 from crewai.tools import tool
 from data_analysis_crew.schemas import ModelOutput
 from data_analysis_crew.utils.utils import to_posix_relative_path
@@ -147,7 +148,7 @@ def build_predictive_model(
                     if problem_type == "classification"
                     else r2_score(y_test, y_pred),
                     model, y_pred)
-        except Exception as e:
+        except (ValueError, RuntimeError, TypeError) as e:
             print(f"⚠️ {name} failed during training: {e}")
 
     if not scores:
@@ -206,7 +207,7 @@ def build_predictive_model(
             plt.close(fig)
             residuals_plot_path = to_posix_relative_path(resid_png, project_root)
             secondary_paths.append(residuals_plot_path)
-    except Exception as e:
+    except (ValueError, RuntimeError, KeyError) as e:
         print(f"❌ Diagnostic plots failed: {e}")
 
     shap_path_str = None
@@ -225,7 +226,7 @@ def build_predictive_model(
                 plt.close()
                 shap_path_str = to_posix_relative_path(shap_file, project_root)
                 secondary_paths.append(shap_path_str)
-        except Exception as e:
+        except (ValueError, RuntimeError, AttributeError) as e:
             print(f"⚠️ SHAP explanation failed: {e}")
 
     try:
@@ -242,7 +243,7 @@ def build_predictive_model(
         fig.savefig(bar_png)
         plt.close(fig)
         secondary_paths.append(to_posix_relative_path(bar_png, project_root))
-    except Exception as e:
+    except (ValueError, RuntimeError, KeyError) as e:
         print(f"❌ Bar chart plot failed: {e}")
 
     if problem_type == "regression":
@@ -253,7 +254,7 @@ def build_predictive_model(
                 "y_pred": y_pred,
                 "residual": y_test - y_pred
             }).to_csv(residuals_path, index=False)
-        except Exception as e:
+        except (PermissionError, OSError, EmptyDataError, TypeError) as e:
             print(f"❌ Could not write residuals.csv: {e}")
 
     metrics = (

@@ -44,6 +44,10 @@ class CleanedDataOutput(BaseModel):
         default=None,
         description="Summary of how missing values were handled"
     )
+    summary_markdown: Optional[str] = Field(
+        default=None,
+        description="Optional markdown summary of cleaning steps, column transformations, and missing value handling"
+    )
 
 class FeatureCorrelation(BaseModel):
     feature: str = Field(description="Feature name")

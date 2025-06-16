@@ -3,7 +3,7 @@ Orchestration of agentic AI crew
 """
 import os
 import subprocess
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 from pathlib import Path
 import hashlib
 from dotenv import load_dotenv
@@ -14,7 +14,7 @@ from crewai.knowledge.source.csv_knowledge_source import CSVKnowledgeSource
 from crewai_tools import (
     CodeInterpreterTool,
     CSVSearchTool,
-    DirectoryReadTool,
+    #DirectoryReadTool,
     FileReadTool,
     FileWriterTool
 )
@@ -22,7 +22,7 @@ from data_analysis_crew.tools import (
     build_predictive_model,
     explore_data,
     launch_dashboard,
-    load_or_clean,
+    #load_or_clean,
     install_dependency
 )
 from data_analysis_crew.schemas import (
@@ -53,7 +53,6 @@ AGENT_LLMS = {
     ),
     "data_analyst": LLM(
         model=ANTHROPIC_MODEL_NAME,
-        #model=OPENAI_MODEL_NAME,
         temperature=0.25
     ),
     "model_builder": LLM(
@@ -70,7 +69,7 @@ AGENT_LLMS = {
     ),
     "data_project_manager": LLM(
         model=OPENAI_MODEL_NAME,
-        temperature=0.1
+        temperature=0.2
     ),
 }
 
@@ -83,14 +82,13 @@ print("\nUsing Models:")
 for role, llm in AGENT_LLMS.items():
     print(f"\t{role}:\n\t\t{llm.model}\t(temp={llm.temperature})")
 print(f"\t{FUNCTION_CALLING_LLM}:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNCTION_CALLING_LLM.temperature})")
-print(f"\tfunction_calling_llm:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNCTION_CALLING_LLM.temperature})")
 
 # ======= GLOBAL PATHS & TOOLS =======
 print(f"\n💾\tUsed data:\t{FILE_NAME}\n🧭\tRelative path:\t{str(REL_PATH_DATA)}\n")
 
 csv_source = CSVKnowledgeSource(file_paths=[FILE_NAME])
 csv_search = CSVSearchTool(csv=str(REL_PATH_DATA))
-directory_reader = DirectoryReadTool()
+#directory_reader = DirectoryReadTool()
 file_reader = FileReadTool()
 file_writer = FileWriterTool()
 
@@ -105,6 +103,7 @@ class DataAnalysisCrew():
     code_interpreter: Optional[CodeInterpreterTool] = None
     # Will be assigned in @before_kickoff from hash(requirements_txt)
     image_tag: Optional[str] = None
+    _external_step_callback: Optional[Callable[[Any], None]] = None
 
     # ── Docker environment ───────────────────────────────
     @before_kickoff
@@ -172,12 +171,13 @@ RUN pip install --upgrade pip && \\
             llm=AGENT_LLMS["data_engineer"],
             tools=[
                 tool for tool in [
+                    csv_search,
+                    file_writer,
                     self.code_interpreter,
                     install_dependency,
                     explore_data,
                     file_reader,
-                    csv_search,
-                    load_or_clean
+                    #load_or_clean
                 ] if tool is not None
             ],
             function_calling_llm=FUNCTION_CALLING_LLM,
@@ -198,6 +198,8 @@ RUN pip install --upgrade pip && \\
             llm=AGENT_LLMS["data_analyst"],
             tools=[
                 tool for tool in [
+                    csv_search,
+                    file_writer,
                     self.code_interpreter,
                     install_dependency,
                     explore_data
@@ -363,10 +365,28 @@ RUN pip install --upgrade pip && \\
             config=self.tasks_config["launch_dashboard"],
             context=[self.validate_summary()]
         )
+    
+    # ── Delegation Activity ──────────────────────────────
+    def track_collaboration(self, output):
+        raw = getattr(output, "raw", str(output))
+
+        if "Delegate work to coworker" in raw:
+            print("🤝 Delegation occurred")
+            print(f"🔍 Raw delegation payload:\n{raw}")
+
+        if "Ask question to coworker" in raw:
+            print("❓ Question asked")
+            print(f"🔍 Raw question payload:\n{raw}")
+
+        if self._external_step_callback:
+            self._external_step_callback(output)
 
     # ── Crew Configuration ───────────────────────────────
     @crew
     def crew(self, **kwargs) -> Crew:
+        # External callback
+        self._external_step_callback = kwargs.pop("on_step_callback", None)
+
         non_manager_agents = [
             agent for agent in self.agents if agent != self.data_project_manager()
         ]
@@ -380,5 +400,6 @@ RUN pip install --upgrade pip && \\
             manager_agent=self.data_project_manager(),
             planning=True,
             output_log_file="output/crew_log.json",
+            step_callback=self.track_collaboration,
             **kwargs
         )
