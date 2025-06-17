@@ -58,8 +58,8 @@ clean_data:
       - Dropped columns
       - Imputation strategy used
     - Save metadata to:
-      - JSON: "{output_dir}/{file_name}_cleaning_summary.json"
-      - Markdown: "{output_dir}/{file_name}_cleaning_summary.md"
+      - JSON: "{summary_path_json}"
+      - Markdown: "{summary_path_md}"
 
     ✅ Ensure:
     - Cleaned CSV is ML-ready (no metadata)
@@ -86,7 +86,7 @@ clean_data:
       ```
   agent: data_engineer
   context: [load_data]
-  output_file: "{cleaned_path}"
+  output_file: "{output_dir}/{file_name}_cleaning_summary.json"
 
 # 3. EXPLORE DATA (EDA)
 explore_data:
