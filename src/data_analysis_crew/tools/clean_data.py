@@ -1,59 +1,57 @@
+import os
+import json
 import pandas as pd
-from typing import Optional
 from crewai.tools import tool
-from data_analysis_crew.schemas import CleanedDataOutput
-from data_analysis_crew.utils.utils import to_posix_relative_path
-from data_analysis_crew.utils.project_root import resolve_path, get_project_root
+from data_analysis_crew.schemas import CleanedDataOutput 
 
-
-@tool("load_or_clean")
-def load_or_clean(
-    raw_path: Optional[str] = None,
-    dataset_path: Optional[str] = None,
-    cleaned_path: Optional[str] = None,
-) -> CleanedDataOutput:
+@tool("clean_data_tool")
+def clean_data_tool(raw_path: str, cleaned_path: str, summary_path_json: str, summary_path_md: str) -> CleanedDataOutput:
     """
-    If `cleaned_path` exists, load and return metadata.
-    Otherwise:
-      - Read from `raw_path` or `dataset_path`
-      - Normalize column names (strip, lowercase, replace spaces with underscores)
-      - Save cleaned CSV to `cleaned_path`
-      - Return structured metadata using CleanedDataOutput schema.
+    Cleans the raw dataset and outputs:
+    - a cleaned CSV file
+    - a JSON metadata summary
+    - a Markdown summary report
     """
-    source = raw_path or dataset_path
-    if not source:
-        raise ValueError("Either `raw_path` or `dataset_path` must be provided.")
-    if not cleaned_path:
-        raise ValueError("Missing `cleaned_path` argument.")
 
-    raw_file = resolve_path(source)
-    clean_file = resolve_path(cleaned_path)
+    df = pd.read_csv(raw_path)
+    df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
+    df = df.dropna()
 
-    print(f"📂 Checking for existing cleaned file: {clean_file}")
+    os.makedirs(os.path.dirname(cleaned_path), exist_ok=True)
+    df.to_csv(cleaned_path, index=False)
 
-    if clean_file.exists():
-        df = pd.read_csv(clean_file)
-        print(f"✅ Loaded existing cleaned file: {clean_file}")
-    else:
-        print(f"🧼 Cleaning raw file: {raw_file}")
-        df = pd.read_csv(raw_file)
-        df.columns = (
-            df.columns
-            .str.strip()
-            .str.lower()
-            .str.replace(" ", "_", regex=False)
-        )
-        clean_file.parent.mkdir(parents=True, exist_ok=True)
-        df.to_csv(clean_file, index=False)
-        print(f"✅ Saved new cleaned file: {clean_file}")
+    categorical = list(df.select_dtypes(include=["object", "category"]).columns)
+    numeric = list(df.select_dtypes(include=["number"]).columns)
 
-    # Assemble output
-    cleaned_posix = to_posix_relative_path(clean_file.resolve(), get_project_root())
-    return CleanedDataOutput(
-        cleaned_path=cleaned_posix,
-        final_features=df.columns.tolist(),
-        categorical_features=df.select_dtypes(include=['object', 'category']).columns.tolist(),
-        numeric_features=df.select_dtypes(include='number').columns.tolist(),
-        dropped_columns=[],  # Extend logic in the future
-        imputation_summary=None  # Extend logic in the future
+    summary_md = (
+        f"## Data Cleaning Summary\n"
+        f"- **Dropped Columns:** None\n"
+        f"- **Categorical Features:** {', '.join(categorical)}\n"
+        f"- **Numeric Features:** {', '.join(numeric)}\n"
     )
+
+    # Save JSON
+    summary_json = {
+        "cleaned_path": cleaned_path,
+        "final_features": list(df.columns),
+        "categorical_features": categorical,
+        "numeric_features": numeric,
+        "dropped_columns": [],
+        "imputation_summary": {"strategy": "Dropped rows with missing values"},
+        "summary_markdown": summary_md,
+        "summary_path_json": summary_path_json,
+        "summary_path_md": summary_path_md
+    }
+
+    os.makedirs(os.path.dirname(summary_path_json), exist_ok=True)
+    with open(summary_path_json, "w", encoding="utf-8") as f:
+        json.dump(summary_json, f, indent=2)
+
+    # Save Markdown
+    os.makedirs(os.path.dirname(summary_path_md), exist_ok=True)
+    with open(summary_path_md, "w", encoding="utf-8") as f:
+        f.write(summary_md)
+
+    #return summary_json # needs typehint in line def clean_data_tool(...) -> dict:
+    # ✅ Explicit return as typed Pydantic model
+    return CleanedDataOutput(**summary_json)

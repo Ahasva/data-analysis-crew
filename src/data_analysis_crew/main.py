@@ -48,8 +48,6 @@ def run() -> None:
     output_path.mkdir(parents=True, exist_ok=True)
     (output_path / "plots").mkdir(parents=True, exist_ok=True)
 
-    #file_name = "diabetes.csv"
-    #name_root = file_name.removesuffix(".csv")
     inputs = {
         "file_name": FILE_NAME,
         "dashboard_file": DASHBOARD_FILE,
@@ -57,6 +55,8 @@ def run() -> None:
         "raw_path": REL_PATH_DATA,
         "cleaned_path": CLEANED_PATH,
         "output_dir": OUTPUT_DIR,
+        "summary_path_json": f"{OUTPUT_DIR}/{FILE_NAME.replace('.csv', '_cleaning_summary.json')}",
+        "summary_path_md": f"{OUTPUT_DIR}/{FILE_NAME.replace('.csv', '_cleaning_summary.md')}",
         "plot_path": PLOT_PATH,
         "request": REQUEST,
         "install_hint": INSTALL_LIB_TEMPLATE,

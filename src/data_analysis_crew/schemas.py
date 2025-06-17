@@ -46,7 +46,15 @@ class CleanedDataOutput(BaseModel):
     )
     summary_markdown: Optional[str] = Field(
         default=None,
-        description="Optional markdown summary of cleaning steps, column transformations, and missing value handling"
+        description="Markdown summary of cleaning steps, column transformations, and missing value handling"
+    )
+    summary_path_json: Optional[str] = Field(
+        default=None,
+        description="Path to the structured JSON file containing the cleaning summary metadata"
+    )
+    summary_path_md: Optional[str] = Field(
+        default=None,
+        description="Path to the Markdown file describing the cleaning process"
     )
 
 class FeatureCorrelation(BaseModel):

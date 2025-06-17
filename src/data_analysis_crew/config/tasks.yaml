@@ -35,7 +35,7 @@ load_data:
   agent: data_engineer
   output_file: "{output_dir}/{file_name}_metadata.json"
 
-# 2. CLEAN DATA (outputs structured CSV only)
+# 2. CLEAN DATA (outputs structured CSV + metadata JSON/MD)
 clean_data:
   description: |
     Clean the raw dataset at "{raw_path}".
@@ -44,20 +44,46 @@ clean_data:
     - Load CSV
     - Normalize column names (lowercase, replace spaces with underscores)
     - Handle missing values intelligently (drop or fill)
-    - Save result to "{cleaned_path}" using the following codeblock:
+    - Save cleaned data to "{cleaned_path}" as CSV:
       ```python
       import pandas as pd
       df = pd.read_csv("{raw_path}")
       df.to_csv("{cleaned_path}", index=False)
       ```
 
+    Additionally:
+    - Extract metadata:
+      - Final features (columns after cleaning)
+      - Categorical and numeric feature types
+      - Dropped columns
+      - Imputation strategy used
+    - Save metadata to:
+      - JSON: "{output_dir}/{file_name}_cleaning_summary.json"
+      - Markdown: "{output_dir}/{file_name}_cleaning_summary.md"
+
     ✅ Ensure:
-    - File saved successfully
-    - Output is Machine Learning-ready (no metadata)
-    - Print final shape (rows, columns)
-    - Return a confirmation message like: "Cleaned data saved to '{cleaned_path}'"
-  expected_output: >
-    "Cleaned data saved to {cleaned_path} with X rows and Y columns."
+    - Cleaned CSV is ML-ready (no metadata)
+    - Metadata is saved separately as human + machine-readable files
+    - Return confirmation of the process
+  expected_output: |
+    - Cleaned CSV at "{cleaned_path}"
+    - Cleaning summary saved to:
+      - "{output_dir}/{file_name}_cleaning_summary.json"
+      - "{output_dir}/{file_name}_cleaning_summary.md"
+    - JSON response should look like:
+      ```json
+      {
+        "cleaned_path": "{cleaned_path}",
+        "summary_path_json": "{output_dir}/{file_name}_cleaning_summary.json",
+        "summary_path_md": "{output_dir}/{file_name}_cleaning_summary.md",
+        "final_features": [...],
+        "categorical_features": [...],
+        "numeric_features": [...],
+        "dropped_columns": [...],
+        "imputation_summary": {...},
+        "summary_markdown": "..."
+      }
+      ```
   agent: data_engineer
   context: [load_data]
   output_file: "{cleaned_path}"
@@ -128,6 +154,7 @@ build_predictive_model:
       - Model summary to "{output_dir}/model-report.json"
       - Technical metrics to "{output_dir}/technical-metrics.md"
       - Visualizations to "{plot_path}/..."
+    Visuals (plots) usually include: ROC curve, Feature importance, Confusion matrix etc.
   expected_output: |
     - JSON report: "{output_dir}/model-report.json"
     - Model performance plots in "{plot_path}/...", e.g. "{plot_path}/feature_importance.png"

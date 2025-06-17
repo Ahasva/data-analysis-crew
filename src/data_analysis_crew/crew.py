@@ -14,7 +14,7 @@ from crewai.knowledge.source.csv_knowledge_source import CSVKnowledgeSource
 from crewai_tools import (
     CodeInterpreterTool,
     CSVSearchTool,
-    #DirectoryReadTool,
+    DirectoryReadTool,
     FileReadTool,
     FileWriterTool
 )
@@ -22,6 +22,7 @@ from data_analysis_crew.tools import (
     build_predictive_model,
     explore_data,
     launch_dashboard,
+    clean_data_tool,
     #load_or_clean,
     install_dependency
 )
@@ -36,6 +37,7 @@ from data_analysis_crew.schemas import (
 # ─── import centralized paths ─────────────────────────────────────────────────
 from data_analysis_crew.settings import FILE_NAME, REL_PATH_DATA
 
+
 # ======= LOAD ENVIRONMENT VARIABLES =======
 load_dotenv()
 
@@ -44,6 +46,7 @@ ANTHROPIC_MODEL_NAME = os.getenv("ANTHROPIC_MODEL_NAME", "anthropic/claude-3-hai
 GOOGLE_MODEL_NAME = os.getenv("GOOGLE_MODEL_NAME", "gemini/gemini-2.0-flash")
 
 default_tag = os.getenv("CREWAI_DOCKER_IMAGE_TAG", "code-interpreter:latest")
+
 
 # ======= LLM CONFIGURATIONS =======
 AGENT_LLMS = {
@@ -83,14 +86,19 @@ for role, llm in AGENT_LLMS.items():
     print(f"\t{role}:\n\t\t{llm.model}\t(temp={llm.temperature})")
 print(f"\t{FUNCTION_CALLING_LLM}:\n\t\t{FUNCTION_CALLING_LLM.model}\t(temp={FUNCTION_CALLING_LLM.temperature})")
 
+
 # ======= GLOBAL PATHS & TOOLS =======
 print(f"\n💾\tUsed data:\t{FILE_NAME}\n🧭\tRelative path:\t{str(REL_PATH_DATA)}\n")
 
+# ─── Knowledge Source ────────────────────────────────────────────────────────────────────────
 csv_source = CSVKnowledgeSource(file_paths=[FILE_NAME])
+
+# ─── Tools ───────────────────────────────────────────────────────────────────────────────────
 csv_search = CSVSearchTool(csv=str(REL_PATH_DATA))
-#directory_reader = DirectoryReadTool()
+directory_reader = DirectoryReadTool()
 file_reader = FileReadTool()
 file_writer = FileWriterTool()
+
 
 # ======= CREW =======
 @CrewBase
@@ -105,12 +113,12 @@ class DataAnalysisCrew():
     image_tag: Optional[str] = None
     _external_step_callback: Optional[Callable[[Any], None]] = None
 
-    # ─── @before_kickoff ───────────────────────────────
+    # ─── @before_kickoff ──────────────────────────────────────────────────────────────────────
     @before_kickoff
     def prepare_inputs(self, inputs):
         """Set up Docker + ensure all runtime variables like `file_name` are clean"""
 
-        # ─── Docker Setup ───────────────────────────────────────
+        # ─── Docker Setup ─────────────────────────────────────────────────────────────────────
         print("🔧 Setting up Docker environment with required libraries...")
         BUILD_DIR = Path("build")
         BUILD_DIR.mkdir(parents=True, exist_ok=True)
@@ -156,7 +164,7 @@ class DataAnalysisCrew():
         else:
             print("⚠️ No 'available_libraries' input provided — skipping Docker setup.")
 
-        # ─── Input Cleaning ─────────────────────────────────────
+        # ─── Input Cleaning ───────────────────────────────────────────────────────────────────
         if "file_name" not in inputs and "raw_path" in inputs:
             inputs["file_name"] = Path(inputs["raw_path"]).stem
             print(f"🧠 Inferred file_name from raw_path: {inputs['file_name']}")
@@ -165,7 +173,7 @@ class DataAnalysisCrew():
             inputs["file_name"] = Path(inputs["file_name"]).stem
             print(f"🧼 Cleaned file_name: {inputs['file_name']}")
 
-        # ─── Debug ──────────────────────────────────────────────
+        # ─── Debug ────────────────────────────────────────────────────────────────────────────
         print("\n🚀 Final Inputs for Crew:")
         for key, value in inputs.items():
             print(f"   {key}: {value}")
@@ -181,6 +189,8 @@ class DataAnalysisCrew():
             tools=[
                 tool for tool in [
                     csv_search,
+                    clean_data_tool,
+                    directory_reader,
                     file_writer,
                     self.code_interpreter,
                     install_dependency,
@@ -208,6 +218,8 @@ class DataAnalysisCrew():
             tools=[
                 tool for tool in [
                     csv_search,
+                    clean_data_tool,
+                    directory_reader,
                     file_writer,
                     self.code_interpreter,
                     install_dependency,
@@ -238,6 +250,7 @@ class DataAnalysisCrew():
                     install_dependency,
                     explore_data,
                     csv_search,
+                    directory_reader,
                     build_predictive_model
                 ] if tool is not None
             ],
@@ -260,6 +273,7 @@ class DataAnalysisCrew():
             llm=AGENT_LLMS["insight_reporter"],
             tools=[
                 tool for tool in [
+                    directory_reader,
                     self.code_interpreter,
                     install_dependency,
                     file_writer,
@@ -276,13 +290,14 @@ class DataAnalysisCrew():
             max_execution_time=180,
             max_reasoning_attempts=2
         )
-    
+
     @agent
     def quality_checker(self) -> Agent:
         return Agent(
             config=self.agents_config["quality_checker"],
             llm=AGENT_LLMS["quality_checker"],
             tools=[
+                directory_reader,
                 file_reader,
                 file_writer
             ],
@@ -310,7 +325,7 @@ class DataAnalysisCrew():
             allow_delegation=True
         )
 
-    # ─── Task Configuration ───────────────────────────────
+    # ─── Task Configuration ────────────────────────────────────────────────────────────────
     @task
     def load_data(self) -> Task:
         return Task(
@@ -375,17 +390,19 @@ class DataAnalysisCrew():
             context=[self.validate_summary()]
         )
 
-    # ─── Delegation Activity ──────────────────────────────
+    # ─── Delegation Activity ───────────────────────────────────────────────────────────────
     def track_collaboration(self, output):
-        raw = getattr(output, "raw", str(output))
+        task_description = getattr(output, "task_description", "Unknown task")
+        agent_name = getattr(output, "agent_name", "Unknown agent")
 
-        if "Delegate work to coworker" in raw:
-            print("🤝 Delegation occurred")
-            print(f"🔍 Raw delegation payload:\n{raw}")
+        print(f"\n📡 Step Callback → Task: {task_description[:80]}... | Agent: {agent_name}")
+        print(f"🔍 Raw Output:\n{str(output)[:1000]}")
 
-        if "Ask question to coworker" in raw:
-            print("❓ Question asked")
-            print(f"🔍 Raw question payload:\n{raw}")
+        if "Delegate work to coworker" in str(output):
+            print("🤝 Delegation occurred!")
+
+        if "Ask question to coworker" in str(output):
+            print("❓ Question asked!")
 
         if self._external_step_callback:
             self._external_step_callback(output)
