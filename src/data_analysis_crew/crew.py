@@ -105,18 +105,13 @@ class DataAnalysisCrew():
     image_tag: Optional[str] = None
     _external_step_callback: Optional[Callable[[Any], None]] = None
 
-    # ─── Docker environment ───────────────────────────────
+    # ─── @before_kickoff ───────────────────────────────
     @before_kickoff
-    def setup_docker_environment(self, inputs):
-        # ─── Autofill cleaned_path if missing ─────────────────────
-        if not inputs.get("cleaned_path"):
-            raw_path = Path(inputs["raw_path"])
-            cleaned_name = raw_path.stem + "_cleaned.csv"
-            inputs["cleaned_path"] = str(Path(inputs["root_folder"]) / cleaned_name)
-            print(f"📍 Auto-filled cleaned_path = {inputs['cleaned_path']}")
-            
-        print("🔧 Setting up Docker environment with required libraries...")
+    def prepare_inputs(self, inputs):
+        """Set up Docker + ensure all runtime variables like `file_name` are clean"""
 
+        # ─── Docker Setup ───────────────────────────────────────
+        print("🔧 Setting up Docker environment with required libraries...")
         BUILD_DIR = Path("build")
         BUILD_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -126,28 +121,22 @@ class DataAnalysisCrew():
             print(f"📦 Created build/requirements.txt with: {inputs['available_libraries']}")
 
             dockerfile = """
-FROM python:3.12-slim
+    FROM python:3.12-slim
 
-COPY requirements.txt .
+    COPY requirements.txt .
 
-RUN pip install --upgrade pip && \\
-    pip install --no-cache-dir -r requirements.txt
-"""
+    RUN pip install --upgrade pip && \\
+        pip install --no-cache-dir -r requirements.txt
+    """
             (BUILD_DIR / "Dockerfile").write_text(dockerfile, encoding="utf-8")
             print("📝 Created build/Dockerfile")
 
-            # ✅ Tag with requirements hash
             hash_source = (BUILD_DIR / "requirements.txt").read_bytes()
             requirements_hash = hashlib.md5(hash_source).hexdigest()
-            print(f"🔐 Docker hash: {requirements_hash}")
             self.image_tag = f"crewai-env:{requirements_hash}"
             self.code_interpreter = CodeInterpreterTool(default_image_tag=self.image_tag)
             print(f"🧩 Using Docker image tag: {self.image_tag}")
 
-            # 🟡 Optional: Save hash to disk for future reference/debugging
-            (BUILD_DIR / "requirements.hash").write_text(self.image_tag, encoding="utf-8")
-
-            # ✅ Only build if needed
             existing_images = subprocess.run(
                 ["docker", "images", "-q", self.image_tag],
                 capture_output=True,
@@ -157,35 +146,26 @@ RUN pip install --upgrade pip && \\
 
             if existing_images.stdout.strip():
                 print(f"✅ Docker image {self.image_tag} already exists. Skipping build.")
-                return
             else:
                 print(f"🔨 Docker image '{self.image_tag}' not found. Building now...")
-                try:
-                    subprocess.run(["docker", "build", "-t",
-                                    self.image_tag, str(BUILD_DIR)],
-                                    check=True)
-                    print("✅ Docker image built successfully.")
-                except subprocess.CalledProcessError as e:
-                    print(f"❌ Docker build failed: {e}")
+                subprocess.run(["docker", "build", "-t",
+                                self.image_tag, str(BUILD_DIR)],
+                                check=True)
+                print("✅ Docker image built successfully.")
+
         else:
             print("⚠️ No 'available_libraries' input provided — skipping Docker setup.")
 
-    # ─── Providing inputs for .kickoff() ───────────────────────────────
-    @before_kickoff
-    def prepare_inputs(self, inputs):
-        """Ensure all runtime variables like `file_name` are present and clean."""
-
-        # Fallback: derive `file_name` from raw_path
+        # ─── Input Cleaning ─────────────────────────────────────
         if "file_name" not in inputs and "raw_path" in inputs:
             inputs["file_name"] = Path(inputs["raw_path"]).stem
             print(f"🧠 Inferred file_name from raw_path: {inputs['file_name']}")
 
-        # Normalize: remove file extension if present
         if "file_name" in inputs:
             inputs["file_name"] = Path(inputs["file_name"]).stem
             print(f"🧼 Cleaned file_name: {inputs['file_name']}")
 
-        # 🔍 Debug the final inputs
+        # ─── Debug ──────────────────────────────────────────────
         print("\n🚀 Final Inputs for Crew:")
         for key, value in inputs.items():
             print(f"   {key}: {value}")

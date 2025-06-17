@@ -33,7 +33,7 @@ load_data:
     }
     ```
   agent: data_engineer
-  output_file: "output/{file_name}_metadata.json"
+  output_file: "{output_dir}/{file_name}_metadata.json"
 
 # 2. CLEAN DATA (outputs structured CSV only)
 clean_data:
@@ -89,7 +89,7 @@ explore_data:
     - Insightful commentary: Bullet point summary (3–5 key findings)
   agent: data_analyst
   context: [clean_data]
-  output_file: "output/exploration_report.md"
+  output_file: "{output_dir}/exploration_report.md"
 
 # 4. SELECT FEATURES
 select_features:
@@ -131,7 +131,7 @@ build_predictive_model:
   expected_output: |
     - JSON report: "{output_dir}/model-report.json"
     - Model performance plots in "{plot_path}/...", e.g. "{plot_path}/feature_importance.png"
-    - Markdown summary: "output/technical-metrics.md"
+    - Markdown summary: "{output_dir}/technical-metrics.md"
   agent: model_builder
   context: [clean_data, select_features]
 
@@ -149,7 +149,7 @@ summarize_findings:
       - Regression: {regression_metrics}
 
   expected_output: |
-    Markdown file at "output/final-insight-summary.md" containing:
+    Markdown file at "{output_dir}/final-insight-summary.md" containing:
     - Executive summary (at least 2–3 sentence narrative overview of what the data reveals; 
     what analysis was performed; what model was selected and why it was selected)
     - Key insights (at least 3-5 bullet points, which summarize important findings, correlations, etc.)
@@ -159,12 +159,12 @@ summarize_findings:
     (Use a header structure: ## ✅)
   agent: insight_reporter
   context: [build_predictive_model]
-  output_file: "output/final-insight-summary.md"
+  output_file: "{output_dir}/final-insight-summary.md"
 
 # 7. CHECKLIST VALIDATION
 validate_summary:
   description: |
-    Validate the summary at "output/final-insight-summary.md".
+    Validate the summary at "{output_dir}/final-insight-summary.md".
 
     Checklist:
     - Executive summary present?
@@ -178,14 +178,14 @@ validate_summary:
 
     Save results as:
     - Markdown checklist
-    - Text log to "output/summary_qc_log.txt"
+    - Text log to "{output_dir}/summary_qc_log.txt"
 
   expected_output: |
     - Markdown checklist with ✅/❌ for each item
-    - Checklist saved as: "output/summary_qc_log.txt"
+    - Checklist saved as: "{output_dir}/summary_qc_log.txt"
   agent: quality_checker
   context: [summarize_findings]
-  output_file: "output/final-report-checklist.md"
+  output_file: "{output_dir}/final-report-checklist.md"
 
 # 8. LAUNCH DASHBOARD
 launch_dashboard:
