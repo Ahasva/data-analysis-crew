@@ -1,127 +1,116 @@
 # ============================================================================
-#  DATA ANALYSIS CREW - TASK DEFINITIONS (cleaned & path-corrected)
+#  DATA ANALYSIS CREW - TASK DEFINITIONS (refined and production-grade)
 # ============================================================================
 
-# 1. LOAD RAW CSV (Prompt-based, no custom tool)
+# 1. LOAD RAW CSV
 load_data:
-  description: >
-    Load the dataset from `{raw_path}` and return basic metadata inside folder called `output/`, like:
+  description: |
+    Load the dataset from "{raw_path}" and extract core metadata and write this to "output/{file_name}_metadata.json":
     - DataFrame shape (rows, columns)
     - List of column names
     - Dictionary of missing values per column
     - Dictionary of data types per column
 
-    Use Python and pandas to compute this information (via CodeInterpreterTool), example:
+    Use Python and pandas to compute this information (via CodeInterpreterTool):
     ```python
     import pandas as pd
-    df = pd.read_csv("{dataset_path}")
+    df = pd.read_csv("{raw_path}")
     print(df.shape)
-    print(list(df.columns))
+    print(df.columns.tolist())
     print(df.isnull().sum().to_dict())
     print(df.dtypes.astype(str).to_dict())
     ```
 
-    Your output must be returned as structured data, preferably CSV, 
-    that downstream agents can parse.
-
-    Required input:
-    - raw_path
-  expected_output: >
+    💡 Save results as structured JSON (not CSV) to the "output/" folder.
+  expected_output: |
+    JSON dictionary including:
     ```json
     {
-      "shape": [rows, columns],
-      "columns": [...],
-      "missing": {...},
-      "dtypes": {...}
+      "shape": [int, int],
+      "columns": [str, ...],
+      "missing": {column: int, ...},
+      "dtypes": {column: dtype_str, ...}
     }
     ```
   agent: data_engineer
-  output_file: output/{file_name}_metadata.json
+  output_file: "output/{file_name}_metadata.json"
 
-# 2. CLEAN DATA (Prompt-driven with Docker-based code interpreter)
+# 2. CLEAN DATA (outputs structured CSV only)
 clean_data:
-  description: >
-    Clean the dataset at `{raw_path}`!
-    - Load the CSV using pandas
+  description: |
+    Clean the raw dataset at "{raw_path}".
+
+    Tasks:
+    - Load CSV
     - Normalize column names (lowercase, replace spaces with underscores)
     - Handle missing values intelligently (drop or fill)
-    - Ensure the directory for `{cleaned_path}` exists: {root_folder}
-    - Save the cleaned file to `{cleaned_path}` by calling:
+    - Save result to "{cleaned_path}" using the following codeblock:
       ```python
-      df.to_csv(cleaned_path, index=False)
+      import pandas as pd
+      df = pd.read_csv("{raw_path}")
+      df.to_csv("{cleaned_path}", index=False)
       ```
-    - Return a fully cleaned dataset that can be used for machine learning modeling
-    - Return a confirmation message like: "Cleaned data saved to {cleaned_path}"
-    
-    Return:
-    - Path to the cleaned file
-    - Lists of final, numeric, and categorical features
-    - Optional: JSON summary of shape, final_featureds, numeric_features, 
-    categorical_features, column_names, missing values handled
 
+    ✅ Ensure:
+    - File saved successfully
+    - Output is Machine Learning-ready (no metadata)
+    - Print final shape (rows, columns)
+    - Return a confirmation message like: "Cleaned data saved to '{cleaned_path}'"
   expected_output: >
-    - **MOST IMPORTANT**: fully cleaned dataset (CSV) based on {raw_path} saved to {cleaned_path}
-    - Secondary: JSON file with a structure like:
-      ```json
-      {
-      "cleaned_path": "{cleaned_path}",
-      "final_features": [...],
-      "numeric_features": [...],
-      "categorical_features": [...],
-      "summary_markdown": "..."
-      }
-      ```
+    "Cleaned data saved to {cleaned_path} with X rows and Y columns."
   agent: data_engineer
   context: [load_data]
-  output_file: knowledge/{file_name}_cleaned.csv
+  output_file: "{cleaned_path}"
 
-# 3. EXPLORE DATA
+# 3. EXPLORE DATA (EDA)
 explore_data:
-  description: >
-    Perform an exploratory analysis of the cleaned dataset provided by the `clean_data` task!
-    - Summarize the dataset using `df.describe(include="all")` and `df.info(verbose=True)`
+  description: |
+    Perform exploratory data analysis (EDA) on the cleaned dataset "{cleaned_path}".
+
+    Include:
+    - `df.describe(include="all")` and `df.info(verbose=True)` summary
     - Visualize distributions of numeric features
     - Generate a correlation heatmap
     - Identify outliers, collinearity, and missing values
+    - Distribution plots
+
     - Use approved libraries from: {available_libraries}; use other libraries, if necessary
-    - Save at least 3 visualizations (e.g., heatmap, histograms) to folder structure `{plot_path}`: `output/plots/...`.
+    
+    Save at least 3 plots to "{plot_path}" and embed them in a Markdown report with `<img src="..."/>`.
+    Further list:
+    - Top correlations
+    - Visuals
+    - Bullet-point insights
 
-    Notes:
-    - Focus on key statistical takeaways
-    - Ensure plots are informative for model-building
-    - Use built-in `explore_data` tool if available
-
-  expected_output: >
-    - Markdown report with:
-      • 2–5 embedded plots (`<img src="..."/>`)
-      • Top correlations with the target variable
-      • Bullet point summary (3–5 key findings)
+  expected_output: |
+    Markdown report (.md file) with:
+    - 3–5 plots (`<img src="..."/>`)
+    - Key correlations and data trends with the target variable
+    - Insightful commentary: Bullet point summary (3–5 key findings)
   agent: data_analyst
   context: [clean_data]
+  output_file: "output/exploration_report.md"
 
 # 4. SELECT FEATURES
 select_features:
-  description: >
-    Based on the user's request `{request}`, determine:
+  description: |
+    Use EDA results and the user's request: "{request}", to:
+    - Identify Machine Learning problem type: classification or regression
+    - Select top predictive features and target variable
+    - Justify selection based on correlations and domain logic and further: 
+      - outliers, distributions, missingness, descriptive statistics, variable type, anomalies, missing values etc.
 
-    - The appropriate problem type (classification or regression)
-    - The best features to use for modeling
-    - A suitable target variable
-
-    Consider:
-    - Feature correlations, outliers, distributions, missingness, descriptive statistics, 
-    variable type, anomalies, distributions, missing values etc.
-    - Metrics and model families from:
-      - Classification: {classification_metrics}
-      - Regression: {regression_metrics}
-
-  expected_output: >
+    Support with:
+    - Metrics: "{classification_metrics}", "{regression_metrics}"
+    - Feature distributions and data types
+  expected_output: |
+    JSON structure:
     ```json
     {
-      "top_features": [...],
-      "problem_type": "classification",
-      "target_variable": "...",
-      "explanation": "..."
+      "top_features": [str, ...],
+      "target_variable": str,
+      "problem_type": "classification" | "regression",
+      "explanation": str
     }
     ```
   agent: data_analyst
@@ -129,39 +118,38 @@ select_features:
 
 # 5. BUILD MODEL
 build_predictive_model:
-  description: >
-    Train and evaluate Machine Learning models on the cleaned dataset produced by the `clean_data` task!
-    - Auto-detect or confirm problem type (classification/regression)
-    - Train and tune models from `{available_models}`
-    - Save all visual outputs to `{plot_path}` (e.g. `output/plots/...`)
-    - Save evaluation summaries to `{output_dir}` as `.json` and `.md`
+  description: |
+    Train and evaluate Machine Learning models using cleaned data from "{cleaned_path}".
 
-    Use `build_predictive_model` tool if available.
-
-  expected_output: >
-    - JSON report at `output/model-report.json`
-    - Plots at {plot_path} such as `feature_importance.png`, `confusion_matrix.png`, `residuals.png`, e.g `output/plots/feature_importance.png`
-    - Markdown summary: `output/technical-metrics.md`
-
+    Steps:
+    - Determine problem type from context (classification or regression)
+    - Use suitable models from "{available_models}"
+    - Save:
+      - Model summary to "{output_dir}/model-report.json"
+      - Technical metrics to "{output_dir}/technical-metrics.md"
+      - Visualizations to "{plot_path}/..."
+  expected_output: |
+    - JSON report: "{output_dir}/model-report.json"
+    - Model performance plots in "{plot_path}/...", e.g. "{plot_path}/feature_importance.png"
+    - Markdown summary: "output/technical-metrics.md"
   agent: model_builder
   context: [clean_data, select_features]
 
 # 6. SUMMARY REPORT
 summarize_findings:
-  description: >
-    Create an executive-level summary of the modeling results.
-
-    - Summarize the selected model and its performance
-    - Embed plots (at least one, e.g. `<img src="..." width="480"/>`)
+  description: |
+    Generate an executive-level summary of the modeling results:
+    - Summarize model choice, model performance and evaluation
+    - Embed visuals from previous steps (at least one, e.g. `<img src="..." width="480"/>`)
     - Highlight 3–5 key insights
-    - Make a recommendation
+    - Conclude with a business-ready recommendation
 
     Use metrics from:
       - Classification: {classification_metrics}
       - Regression: {regression_metrics}
 
-  expected_output: >
-    A Markdown report saved as `output/final-insight-summary.md`, with:
+  expected_output: |
+    Markdown file at "output/final-insight-summary.md" containing:
     - Executive summary (at least 2–3 sentence narrative overview of what the data reveals; 
     what analysis was performed; what model was selected and why it was selected)
     - Key insights (at least 3-5 bullet points, which summarize important findings, correlations, etc.)
@@ -171,36 +159,41 @@ summarize_findings:
     (Use a header structure: ## ✅)
   agent: insight_reporter
   context: [build_predictive_model]
-  output_file: output/final-insight-summary.md
+  output_file: "output/final-insight-summary.md"
 
 # 7. CHECKLIST VALIDATION
 validate_summary:
-  description: >
-    Run a checklist audit on `output/final-insight-summary.md`:
+  description: |
+    Validate the summary at "output/final-insight-summary.md".
+
+    Checklist:
+    - Executive summary present?
+    - Key insights in bullet format?
+    - Visuals embedded?
+    - Metrics mentioned?
+    - Recommendation included?
 
     - Confirm all required sections are present
     - Flag missing components (plots, metrics, summaries) for each, mark ✅ present or ❌ missing
-    - Save results to `output/summary_qc_log.txt` 
 
-    Include timestamp, pass/fail flags, and fix suggestions.
-  expected_output: >
-    - Markdown checklist report (e.g. ✅ Bullet insights included)
-    - Checklist saved as `output/summary_qc_log.txt`
+    Save results as:
+    - Markdown checklist
+    - Text log to "output/summary_qc_log.txt"
+
+  expected_output: |
+    - Markdown checklist with ✅/❌ for each item
+    - Checklist saved as: "output/summary_qc_log.txt"
   agent: quality_checker
   context: [summarize_findings]
-  output_file: output/final-report-checklist.md
+  output_file: "output/final-report-checklist.md"
 
 # 8. LAUNCH DASHBOARD
 launch_dashboard:
-  description: >
-    Launch the dashboard using the tool `launch_dashboard`.
+  description: |
+    Start the Streamlit dashboard by executing python code: launch_dashboard(path="{dashboard_file}", port=8501)
 
-    Do not open or edit `{dashboard_file}`.
-    Simply run: `launch_dashboard(path="{dashboard_file}", port=8501)` after all other tasks finished
-
+    ⚠️ Do not modify the file manually. Ensure dependencies are installed.
   expected_output: >
     "Dashboard launched on http://localhost:8501"
-
   agent: insight_reporter
   context: [validate_summary]
-  

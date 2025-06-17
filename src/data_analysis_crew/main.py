@@ -48,11 +48,12 @@ def run() -> None:
     output_path.mkdir(parents=True, exist_ok=True)
     (output_path / "plots").mkdir(parents=True, exist_ok=True)
 
+    #file_name = "diabetes.csv"
+    #name_root = file_name.removesuffix(".csv")
     inputs = {
         "file_name": FILE_NAME,
         "dashboard_file": DASHBOARD_FILE,
         "root_folder": ROOT_FOLDER,
-        #"dataset_path": REL_PATH_DATA,
         "raw_path": REL_PATH_DATA,
         "cleaned_path": CLEANED_PATH,
         "output_dir": OUTPUT_DIR,

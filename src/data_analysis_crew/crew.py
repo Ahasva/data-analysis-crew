@@ -105,9 +105,16 @@ class DataAnalysisCrew():
     image_tag: Optional[str] = None
     _external_step_callback: Optional[Callable[[Any], None]] = None
 
-    # ── Docker environment ───────────────────────────────
+    # ─── Docker environment ───────────────────────────────
     @before_kickoff
     def setup_docker_environment(self, inputs):
+        # ─── Autofill cleaned_path if missing ─────────────────────
+        if not inputs.get("cleaned_path"):
+            raw_path = Path(inputs["raw_path"])
+            cleaned_name = raw_path.stem + "_cleaned.csv"
+            inputs["cleaned_path"] = str(Path(inputs["root_folder"]) / cleaned_name)
+            print(f"📍 Auto-filled cleaned_path = {inputs['cleaned_path']}")
+            
         print("🔧 Setting up Docker environment with required libraries...")
 
         BUILD_DIR = Path("build")
@@ -163,7 +170,29 @@ RUN pip install --upgrade pip && \\
         else:
             print("⚠️ No 'available_libraries' input provided — skipping Docker setup.")
 
-    # ── Agent Configuration ───────────────────────────────
+    # ─── Providing inputs for .kickoff() ───────────────────────────────
+    @before_kickoff
+    def prepare_inputs(self, inputs):
+        """Ensure all runtime variables like `file_name` are present and clean."""
+
+        # Fallback: derive `file_name` from raw_path
+        if "file_name" not in inputs and "raw_path" in inputs:
+            inputs["file_name"] = Path(inputs["raw_path"]).stem
+            print(f"🧠 Inferred file_name from raw_path: {inputs['file_name']}")
+
+        # Normalize: remove file extension if present
+        if "file_name" in inputs:
+            inputs["file_name"] = Path(inputs["file_name"]).stem
+            print(f"🧼 Cleaned file_name: {inputs['file_name']}")
+
+        # 🔍 Debug the final inputs
+        print("\n🚀 Final Inputs for Crew:")
+        for key, value in inputs.items():
+            print(f"   {key}: {value}")
+
+        return inputs
+
+    # ─── Agent Configuration ───────────────────────────────
     @agent
     def data_engineer(self) -> Agent:
         return Agent(
@@ -301,7 +330,7 @@ RUN pip install --upgrade pip && \\
             allow_delegation=True
         )
 
-    # ── Task Configuration ───────────────────────────────
+    # ─── Task Configuration ───────────────────────────────
     @task
     def load_data(self) -> Task:
         return Task(
@@ -365,8 +394,8 @@ RUN pip install --upgrade pip && \\
             config=self.tasks_config["launch_dashboard"],
             context=[self.validate_summary()]
         )
-    
-    # ── Delegation Activity ──────────────────────────────
+
+    # ─── Delegation Activity ──────────────────────────────
     def track_collaboration(self, output):
         raw = getattr(output, "raw", str(output))
 
@@ -381,7 +410,7 @@ RUN pip install --upgrade pip && \\
         if self._external_step_callback:
             self._external_step_callback(output)
 
-    # ── Crew Configuration ───────────────────────────────
+    # ─── Crew Configuration ───────────────────────────────
     @crew
     def crew(self, **kwargs) -> Crew:
         # External callback
