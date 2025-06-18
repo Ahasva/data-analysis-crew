@@ -30,36 +30,39 @@ tm_text = TECHNICAL_METRICS.read_text() if TECHNICAL_METRICS.exists() else ""
 st.header("📋 Executive Summary")
 
 if REPORT_MD.exists():
-    raw = REPORT_MD.read_text()
+    try:
+        report_data = json.loads(REPORT_MD.read_text())
+        raw_markdown = report_data.get("summary", "")
+    except json.JSONDecodeError:
+        # fallback if it's a real markdown file
+        raw_markdown = REPORT_MD.read_text()
 
     # 1) Extract the Embedded Visuals and Metrics Summary blocks
     emb_match = re.search(
         r'##\s*✅\s*Embedded Visuals\s*\n([\s\S]*?)(?=\n##\s*✅|\Z)',
-        raw
+        raw_markdown
     )
     emb_block = emb_match.group(1) if emb_match else None
 
     metrics_match = re.search(
         r'##\s*✅\s*Metrics Summary\s*\n([\s\S]*?)(?=\n##\s*✅|\Z)',
-        raw
+        raw_markdown
     )
     metrics_block = metrics_match.group(1) if metrics_match else None
 
-    # 2) Remove all ✅-sections and unwanted artifacts to isolate narrative, insights, recommendation
-    cleaned = raw
-    # drop entire sections for Embedded Visuals, Metrics Summary, Final Checklist
+    # 2) Remove unwanted sections and artifacts from raw markdown
+    cleaned = raw_markdown
     cleaned = re.sub(r'(?m)^##\s*✅\s*Embedded Visuals[\s\S]*?(?=\n##|\Z)', "", cleaned)
-    cleaned = re.sub(r'(?m)^##\s*✅\s*Metrics Summary[\s\S]*?(?=\n##|\Z)',    "", cleaned)
-    cleaned = re.sub(r'(?m)^##\s*✅\s*Final Checklist[\s\S]*',                  "", cleaned)
-    # drop any remaining ✅ headings
-    cleaned = re.sub(r'(?m)^##\s*✅.*$',                                    "", cleaned)
-    # strip out image tags and markdown image embeds
+    cleaned = re.sub(r'(?m)^##\s*✅\s*Metrics Summary[\s\S]*?(?=\n##|\Z)', "", cleaned)
+    cleaned = re.sub(r'(?m)^##\s*✅\s*Final Checklist[\s\S]*', "", cleaned)
+    cleaned = re.sub(r'(?m)^##\s*✅.*$', "", cleaned)
     cleaned = re.sub(r'<img\s+src="[^"]+"[^>]*>', "", cleaned)
-    cleaned = re.sub(r'!\[.*?\]\([^)]+\)',      "", cleaned)
-    # strip out any checklist bullets
+    cleaned = re.sub(r'!\[.*?\]\([^)]+\)', "", cleaned)
+    cleaned = re.sub(r'(?m)^#+\s*Plots.*$', "", cleaned)
+    cleaned = re.sub(r'(?m)^#+\s*(Feature Importance|Confusion Matrix|ROC Curve).*$','', cleaned)
     cleaned = re.sub(r'(?m)^\s*[-*]\s.*[✔✖].*$', "", cleaned)
-    # collapse excessive blank lines
     cleaned = re.sub(r'\n{3,}', "\n\n", cleaned).strip()
+    cleaned = re.sub(r'(?m)^#\s*Plots[\s\S]*?(?=^#|\Z)', "", cleaned)
 
     # 3) Split into narrative, key insights, recommendation
     lines = cleaned.splitlines()
@@ -78,13 +81,12 @@ if REPORT_MD.exists():
     # Render Key Insights
     if bullets:
         st.subheader("✅ Key Insights")
-        for b in bullets:
-            st.markdown(b)
+        st.markdown("\n".join(bullets), unsafe_allow_html=True)
 
     # Render Recommendation
     if recommendation:
         st.subheader("✅ Recommendation")
-        st.markdown(recommendation)
+        st.markdown(recommendation, unsafe_allow_html=True)
 
     # Render Embedded Visuals
     if emb_block:
@@ -93,12 +95,12 @@ if REPORT_MD.exists():
             line = line.strip()
             img_match = re.search(r'<img\s+src="([^"]+)"', line)
             if img_match:
-                rel = img_match.group(1).lstrip("./").lstrip("/")
-                img_path = OUTPUT_DIR / rel
-                if img_path.exists():
+                rel = img_match.group(1).strip().lstrip("./")
+                img_path = (OUTPUT_DIR / rel).resolve()
+                if img_path.suffix.lower() in {".png", ".jpg", ".jpeg"} and img_path.exists():
                     st.image(str(img_path), width=480)
                 else:
-                    st.warning(f"⚠️ Image not found: {img_path}")
+                    st.warning(f"⚠️ Image not found or unsupported: {img_path}")
             elif line.startswith("-"):
                 st.markdown(line)
 
@@ -197,64 +199,65 @@ if model_data:
 # ======= Visualisations ======================================================
 st.header("🖼️ Visualisations")
 
-def _resolve(path_str):
-    candidate = Path(path_str)
-    if candidate.is_absolute() or str(candidate).startswith(str(OUTPUT_DIR)):
-        return candidate
-    return OUTPUT_DIR / candidate
+plot_dir = OUTPUT_DIR / "plots"
+all_images = sorted([
+    img for img in plot_dir.glob("*.png")
+    if img.is_file()
+]) if plot_dir.exists() else []
 
-visuals, titles = [], []
+# Keywords to detect important plots and their display names
+important_keywords = {
+    "roc": "📈 ROC Curve",
+    "correlation": "🌐 Correlation Heatmap",
+    "feature_importance": "🔍 Feature Importances",
+    "confusion_matrix": "🧮 Confusion Matrix",
+    "precision": "📈 Precision-Recall Curve",
+    "residual": "📉 Residuals Plot",
+    "comparison": "📊 Model Comparison"
+}
 
-# Correlation heatmap
-corr_path = _resolve("plots/correlation_heatmap.png")
-if corr_path.exists():
-    visuals.append(corr_path)
-    titles.append("🌐 Correlation Heatmap")
+important_imgs = []
+dist_imgs = []
 
-# Feature importances
-if fp := model_data.get("feature_importance_path"):
-    p = _resolve(fp)
-    if p.exists():
-        visuals.append(p)
-        titles.append("🔍 Feature Importances")
+# Categorize images
+for img in all_images:
+    fname = img.name.lower()
 
-# Confusion matrix
-if cm := model_data.get("confusion_matrix_path"):
-    p = _resolve(cm)
-    if p.exists():
-        visuals.append(p)
-        titles.append("🧮 Confusion Matrix")
+    if fname.startswith("distribution_"):
+        title = fname.replace("distribution_", "").replace(".png", "").replace("_", " ").title()
+        dist_imgs.append((img, title))
+    else:
+        matched_title = None
+        for kw, label in important_keywords.items():
+            if kw in fname:
+                matched_title = label
+                break
+        title = matched_title or "📊 Other Plot"
+        important_imgs.append((img, title))
 
-# Secondary plots
-for sp in model_data.get("secondary_plot_paths", []):
-    p = _resolve(sp)
-    if p.exists() and p not in visuals:
-        nm = p.name.lower()
-        t  = "📊 Secondary Plot"
-        if model_data.get("problem_type") == "classification":
-            if "roc" in nm:
-                t = "📈 ROC Curve"
-            elif "precision" in nm:
-                t = "📈 Precision-Recall Curve"
-            elif "model_score" in nm or "comparison" in nm:
-                t = "📊 Model Comparison"
-        elif model_data.get("problem_type") == "regression" and "residual" in nm:
-            t = "📉 Residuals Plot"
-        visuals.append(p)
-        titles.append(t)
-
-# Render visuals (2 per row)
-if visuals:
-    for i in range(0, len(visuals), 2):
+# Show important plots (2 per row, full width)
+if important_imgs:
+    st.subheader("📌 Key Visualisations")
+    for i in range(0, len(important_imgs), 2):
         cols = st.columns(2)
-        for j, col in enumerate(cols):
+        for j in range(2):
             idx = i + j
-            if idx < len(visuals):
-                with col:
-                    st.subheader(titles[idx])
-                    st.image(str(visuals[idx]), use_container_width=True)
-else:
-    st.info("ℹ️ No plots available to display.")
+            if idx < len(important_imgs):
+                with cols[j]:
+                    st.subheader(important_imgs[idx][1])
+                    st.image(str(important_imgs[idx][0]), use_container_width=True)
+
+# Show distribution plots (3 per row, small size)
+if dist_imgs:
+    st.subheader("🔬 Distribution Plots")
+    for i in range(0, len(dist_imgs), 3):
+        cols = st.columns(3)
+        for j in range(3):
+            idx = i + j
+            if idx < len(dist_imgs):
+                with cols[j]:
+                    st.caption(dist_imgs[idx][1])
+                    st.image(str(dist_imgs[idx][0]), width=320)
 
 # ======= Download Outputs ==================================================
 st.header("📂 Download Outputs")
@@ -262,9 +265,18 @@ dl1, dl2 = st.columns(2)
 with dl1:
     st.subheader("Executive Summary Debug")
     if REPORT_MD.exists():
-        st.code(REPORT_MD.read_text())
+        # Try to extract raw Markdown (from JSON or plain md)
+        try:
+            parsed = json.loads(REPORT_MD.read_text())
+            summary_md = parsed.get("summary", REPORT_MD.read_text())
+        except json.JSONDecodeError:
+            summary_md = REPORT_MD.read_text()
+
+        with st.expander("🔍 Show raw Markdown content"):
+            st.code(summary_md)
+
         st.download_button("📥 Executive Summary (.md)",
-                           REPORT_MD.read_bytes(),
+                           summary_md,
                            file_name="summary.md")
     else:
         st.error("File not found: final-insight-summary.md")

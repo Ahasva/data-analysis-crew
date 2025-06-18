@@ -23,7 +23,6 @@ from data_analysis_crew.tools import (
     explore_data,
     launch_dashboard,
     clean_data_tool,
-    #load_or_clean,
     install_dependency
 )
 from data_analysis_crew.schemas import (
@@ -196,7 +195,6 @@ class DataAnalysisCrew():
                     install_dependency,
                     explore_data,
                     file_reader,
-                    #load_or_clean
                 ] if tool is not None
             ],
             function_calling_llm=FUNCTION_CALLING_LLM,

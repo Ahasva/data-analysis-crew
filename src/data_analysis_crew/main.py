@@ -8,6 +8,7 @@ import sys
 from pathlib import Path
 import json
 import time
+import traceback
 from datetime import datetime, timezone
 from data_analysis_crew.settings import (
     FILE_NAME, ROOT_FOLDER, REL_PATH_DATA, CLEANED_PATH,
@@ -43,7 +44,7 @@ def on_step_callback(step_output):
 
 def run() -> None:
     """Run the full data-analysis crew pipeline."""
-    
+
     output_path = Path(OUTPUT_DIR)
     output_path.mkdir(parents=True, exist_ok=True)
     (output_path / "plots").mkdir(parents=True, exist_ok=True)
@@ -86,7 +87,9 @@ def run() -> None:
         return result
 
     except Exception as e:
-        raise RuntimeError(f"[RUN ERROR] Crew execution failed: {e}") from e
+        print("[RUN ERROR] Crew execution failed:")
+        traceback.print_exc()
+        raise e
 
 def train():
     """

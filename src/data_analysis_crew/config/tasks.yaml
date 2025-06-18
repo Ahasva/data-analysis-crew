@@ -58,8 +58,14 @@ clean_data:
       - Dropped columns
       - Imputation strategy used
     - Save metadata to:
-      - JSON: "{summary_path_json}"
-      - Markdown: "{summary_path_md}"
+      - JSON: Save JSON summary to: "{summary_path_json}"
+      - Markdown: Save Markdown summary to: "{summary_path_md}"
+
+    Required input parameters for this task:
+    - "{raw_path}"
+    - "{cleaned_path}"
+    - "{summary_path_json}"
+    - "{summary_path_md}"
 
     ✅ Ensure:
     - Cleaned CSV is ML-ready (no metadata)
@@ -68,22 +74,20 @@ clean_data:
   expected_output: |
     - Cleaned CSV at "{cleaned_path}"
     - Cleaning summary saved to:
-      - "{output_dir}/{file_name}_cleaning_summary.json"
-      - "{output_dir}/{file_name}_cleaning_summary.md"
-    - JSON response should look like:
-      ```json
+      - "{summary_path_json}"
+      - "{summary_path_md}"
+    - Final tool output should conform to the following JSON schema:
       {
         "cleaned_path": "{cleaned_path}",
-        "summary_path_json": "{output_dir}/{file_name}_cleaning_summary.json",
-        "summary_path_md": "{output_dir}/{file_name}_cleaning_summary.md",
-        "final_features": [...],
-        "categorical_features": [...],
-        "numeric_features": [...],
-        "dropped_columns": [...],
-        "imputation_summary": {...},
+        "summary_path_json": "{summary_path_json}",
+        "summary_path_md": "{summary_path_md}",
+        "final_features": [str, ...],
+        "categorical_features": [str, ...],
+        "numeric_features": [str, ...],
+        "dropped_columns": [str, ...],
+        "imputation_summary": {str: str},
         "summary_markdown": "..."
       }
-      ```
   agent: data_engineer
   context: [load_data]
   output_file: "{output_dir}/{file_name}_cleaning_summary.json"
@@ -108,6 +112,7 @@ explore_data:
     - Visuals
     - Bullet-point insights
 
+    🔁 Ensure the cleaned dataset at "{cleaned_path}" exists before analysis.
   expected_output: |
     Markdown report (.md file) with:
     - 3–5 plots (`<img src="..."/>`)
@@ -129,6 +134,8 @@ select_features:
     Support with:
     - Metrics: "{classification_metrics}", "{regression_metrics}"
     - Feature distributions and data types
+
+    🔁 Ensure EDA results and plots from "{output_file}" exist before attempting feature selection.
   expected_output: |
     JSON structure:
     ```json
@@ -154,11 +161,44 @@ build_predictive_model:
       - Model summary to "{output_dir}/model-report.json"
       - Technical metrics to "{output_dir}/technical-metrics.md"
       - Visualizations to "{plot_path}/..."
-    Visuals (plots) usually include: ROC curve, Feature importance, Confusion matrix etc.
+
+    Visuals (plots) — the following MUST be included:
+    - ROC Curve (for classification)
+    - Confusion Matrix (for classification)
+    - Feature Importances (for tree-based models or models supporting it)
+    - Optionally: Precision-Recall curve, Residual plots (for regression), Model comparison chart
+
+    Save the plots to "{plot_path}" with filenames that include keywords:
+    - roc_curve.png
+    - confusion_matrix.png
+    - feature_importance.png
+
+    - Save visualizations as PNG images using matplotlib or seaborn, e.g.:
+      ```python
+      import matplotlib.pyplot as plt
+      # ... your plot code
+      plt.savefig("output/plots/roc_curve.png", bbox_inches="tight")
+      plt.close()
+      ```
+      Or for seaborn, e.g.:
+      ```python
+      import seaborn as sns
+      sns.heatmap(df.corr())
+      plt.savefig("output/plots/correlation_heatmap.png", bbox_inches="tight")
+      plt.close()
+      ```
+
+    ⚠️ Make sure to save each plot as a **PNG image file (not a folder)** — some agents may mistakenly create a folder named "roc_curve.png". Double-check that the file physically exists on disk after saving.
+
+    🔁 Ensure "{cleaned_path}" is available and up to date before training.
   expected_output: |
     - JSON report: "{output_dir}/model-report.json"
-    - Model performance plots in "{plot_path}/...", e.g. "{plot_path}/feature_importance.png"
+    - Model performance plots saved in "{plot_path}/":
+      - feature_importance.png
+      - confusion_matrix.png
+      - roc_curve.png
     - Markdown summary: "{output_dir}/technical-metrics.md"
+    ✅ Ensure at least the above three plots are generated and saved. The output should confirm their creation.
   agent: model_builder
   context: [clean_data, select_features]
 
@@ -178,11 +218,13 @@ summarize_findings:
   expected_output: |
     Markdown file at "{output_dir}/final-insight-summary.md" containing:
     - Executive summary (at least 2–3 sentence narrative overview of what the data reveals; 
-    what analysis was performed; what model was selected and why it was selected)
+      what analysis was performed; what model was selected and why it was selected)
     - Key insights (at least 3-5 bullet points, which summarize important findings, correlations, etc.)
     - Recommendation (clear, actionable next steps)
-    - Embedded plots (use relative paths)
+    - Embedded plots (use relative paths, e.g. `<img src="output/plots/feature_importance.png" width="480"/>`)
     - Metrics summary table
+
+    ✅ The file MUST be saved as a valid Markdown (.md) file — not JSON or Python dictionary.
     (Use a header structure: ## ✅)
   agent: insight_reporter
   context: [build_predictive_model]
